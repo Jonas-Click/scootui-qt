@@ -59,6 +59,9 @@ int main(int argc, char *argv[])
     // Ensure QMapLibre QML modules (MapLibre.Location) are found
     engine.addImportPath(QStringLiteral("/usr/local/qml"));
     engine.addImportPath(QStringLiteral("/usr/qml"));
+    // Let filesystem layout packs `import ScootUI 1.0` and reuse built-in
+    // widgets via qrc directory imports
+    engine.addImportPath(QStringLiteral("qrc:/"));
 
     Application application;
     BOOT_MARK("Application::initialize starting");

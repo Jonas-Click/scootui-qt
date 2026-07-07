@@ -14,6 +14,8 @@ class Translations : public QObject
     Q_PROPERTY(QString menuThemeAuto READ menuThemeAuto NOTIFY languageChanged)
     Q_PROPERTY(QString menuThemeDark READ menuThemeDark NOTIFY languageChanged)
     Q_PROPERTY(QString menuThemeLight READ menuThemeLight NOTIFY languageChanged)
+    Q_PROPERTY(QString menuColorTheme READ menuColorTheme NOTIFY languageChanged)
+    Q_PROPERTY(QString menuLayout READ menuLayout NOTIFY languageChanged)
     Q_PROPERTY(QString menuBacklight READ menuBacklight NOTIFY languageChanged)
     Q_PROPERTY(QString menuBacklightAuto READ menuBacklightAuto NOTIFY languageChanged)
     Q_PROPERTY(QString menuBacklightLow READ menuBacklightLow NOTIFY languageChanged)
@@ -443,6 +445,8 @@ public:
     QString menuThemeAuto() const { return lookup("menuThemeAuto"); }
     QString menuThemeDark() const { return lookup("menuThemeDark"); }
     QString menuThemeLight() const { return lookup("menuThemeLight"); }
+    QString menuColorTheme() const { return lookup("menuColorTheme"); }
+    QString menuLayout() const { return lookup("menuLayout"); }
     QString menuBacklight() const { return lookup("menuBacklight"); }
     QString menuBacklightAuto() const { return lookup("menuBacklightAuto"); }
     QString menuBacklightLow() const { return lookup("menuBacklightLow"); }

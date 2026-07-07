@@ -1,0 +1,26 @@
+{
+    "name": "Sunset",
+    "author": "Librescoot",
+    "schemaVersion": 1,
+    "dark": {
+        "background": "#14080B",
+        "surface": "#241014",
+        "accent": "#FF7043",
+        "speedFillHigh": "#E91E63",
+        "overspeedA": "#E91E63",
+        "overspeedB": "#FFC107",
+        "arcBackground": "#4A2E33",
+        "powerBarBg": "#4A2E33",
+        "speedTick": "#66FFD180",
+        "speedLabelMajor": "#CCFFD180",
+        "textSecondary": "#B3FFCCBC"
+    },
+    "light": {
+        "background": "#FFF3E0",
+        "surface": "#FFE0B2",
+        "accent": "#F4511E",
+        "speedFillHigh": "#C2185B",
+        "overspeedA": "#C2185B",
+        "overspeedB": "#FF8F00"
+    }
+}

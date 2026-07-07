@@ -14,6 +14,8 @@ public:
 
     Q_INVOKABLE void updateMode(const QString &mode);
     Q_INVOKABLE void updateTheme(const QString &theme);
+    Q_INVOKABLE void updateColorTheme(const QString &name);
+    Q_INVOKABLE void updateLayout(const QString &name);
     Q_INVOKABLE void updateAutoTheme(bool enabled);
     Q_INVOKABLE void updateBacklightMode(const QString &mode);
     Q_INVOKABLE void updateLanguage(const QString &lang);

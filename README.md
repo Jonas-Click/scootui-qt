@@ -126,13 +126,20 @@ qml/
     status_bars/   Battery, top/bottom bars
   overlays/       Modal overlays (menu, toast, bluetooth PIN, ...)
   simulator/      Simulator control panel (desktop mode only)
-  theme/          Theme definitions
 
 assets/
   icons/          SVG icons
   fonts/          Roboto font family
   routes/         Test route data for simulator
   styles/         MapLibre style definitions
+  themes/         Built-in color themes (JSON)
+
+examples/
+  themes/         Starter color themes to copy to /data/scootui/themes/
+  layouts/        Starter layout packs to copy to /data/scootui/layouts/
+
+docs/
+  THEMING.md      Themes & layout packs guide (tokens, schemas, designer API)
 ```
 
 ## Configuration
@@ -144,6 +151,9 @@ assets/
 | `SCOOTUI_REDIS_HOST` | `192.168.7.1` | Redis host (use `none` to disable). Supports `host:port` format |
 | `SCOOTUI_RESOLUTION` | `480x480` | Display resolution (`WIDTHxHEIGHT`). UI scales automatically |
 | `SCOOTUI_SETTINGS_PATH` | _(none)_ | Path to persistent settings file |
+| `SCOOTUI_DATA_DIR` | `/data` | Root for user content (color themes, layout packs) |
+| `SCOOTUI_COLOR_THEME` | _(none)_ | Startup color theme override (dev convenience) |
+| `SCOOTUI_LAYOUT` | _(none)_ | Startup layout pack override (dev convenience) |
 
 ### Runtime Settings (Redis)
 
@@ -162,7 +172,9 @@ Settings are stored in the `settings` Redis hash and can be modified at runtime.
 | `dashboard.show-cloud` | `always`, `active-or-error`, `error`, `never` | `error` | Cloud connection icon visibility |
 | `dashboard.show-internet` | `always`, `active-or-error`, `error`, `never` | `always` | Cellular icon visibility |
 | `dashboard.show-clock` | `always`, `never` | `always` | Clock visibility |
-| `dashboard.theme` | `light`, `dark`, `auto` | `auto` | UI theme |
+| `dashboard.theme` | `light`, `dark`, `auto` | `auto` | Appearance: which variant of the color theme is shown |
+| `dashboard.color-theme` | theme name | `default` | Color theme (built-in or `/data/scootui/themes/*.json`) |
+| `dashboard.layout` | layout name | `default` | Cluster layout pack (`/data/scootui/layouts/<name>/`) |
 | `dashboard.blinker-style` | `default`, `overlay` | `default` | Blinker indicator style |
 | `dashboard.language` | `en`, `de`, ... | `en` | UI language |
 | `dashboard.hop-on-combo` | pipe-delimited token list (e.g. `LB|RB|HORN`) | _(unset)_ | Custom hop-on unlock combo; managed by the hop-on UI |
@@ -192,7 +204,9 @@ redis-cli hset settings dashboard.blinker-style overlay
 
 ## Theming
 
-`ThemeStore` exposes shared design tokens to QML — font scale, border radii, theme-aware text/surface/border colors, and theme-independent status colors (`statusSuccess`, `statusWarning`, `statusError`, `statusNeutral`, `statusInfo`). Use these instead of hardcoding hex literals.
+`ThemeStore` exposes shared design tokens to QML — font scale, border radii, and theme-aware colors (text/surface/border, accent, speedometer palette, status colors). Use these instead of hardcoding hex literals.
+
+Token values are data-driven: built-in palettes live in `assets/themes/*.json`, and users can add their own color themes to `/data/scootui/themes/` and full custom cluster layouts to `/data/scootui/layouts/` — no rebuild needed, with live hot-reload on file changes. See [docs/THEMING.md](docs/THEMING.md) for the token table, file formats, and the layout-pack designer API; starter files are in [examples/](examples/).
 
 ## Screens
 

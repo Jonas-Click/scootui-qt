@@ -75,6 +75,7 @@ set(CPP_SOURCES
     src/stores/CbBatteryStore.cpp
     src/stores/AuxBatteryStore.cpp
     src/stores/ThemeStore.cpp
+    src/stores/LayoutStore.cpp
     src/stores/ScreenStore.cpp
     src/stores/MenuStore.cpp
     src/stores/HopOnStore.cpp
@@ -146,6 +147,7 @@ set(CPP_HEADERS
     src/stores/CbBatteryStore.h
     src/stores/AuxBatteryStore.h
     src/stores/ThemeStore.h
+    src/stores/LayoutStore.h
     src/stores/ScreenStore.h
     src/stores/MenuStore.h
     src/stores/TripStore.h
@@ -372,6 +374,8 @@ qt_add_qml_module(scootui
         assets/fonts/subset/MaterialIcons-Regular.otf
         assets/styles/mapdark.json
         assets/styles/maplight.json
+        assets/themes/default.json
+        assets/themes/amber.json
 )
 
 target_include_directories(scootui PRIVATE ${HIREDIS_INCLUDE_DIRS})

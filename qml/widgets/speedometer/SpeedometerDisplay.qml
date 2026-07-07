@@ -11,7 +11,6 @@ Item {
     readonly property real targetSpeed: typeof engineStore !== "undefined" ? engineStore.speed : 0
     readonly property real motorCurrent: typeof engineStore !== "undefined" ? engineStore.motorCurrent : 0
     readonly property bool ecuStale: typeof engineStore !== "undefined" && engineStore.faultCode === 20
-    readonly property bool isDark: themeStore.isDark
 
     // Internal animated speed
     property real animatedSpeed: 0
@@ -51,8 +50,11 @@ Item {
     // Start animation when acceleration/pulse state changes
     onIsAcceleratingChanged: if (isAccelerating) _animationActive = true
 
-    // Repaint on theme change
-    onIsDarkChanged: canvas.requestPaint()
+    // Repaint on theme change (variant flip or color-theme reload)
+    Connections {
+        target: themeStore
+        function onThemeChanged() { canvas.requestPaint() }
+    }
     // ECU comm-lost (E20): kick the frame loop so the red glow pulses, and
     // repaint immediately on the rising/falling edge.
     onEcuStaleChanged: { _animationActive = true; canvas.requestPaint() }
@@ -148,12 +150,11 @@ Item {
             ctx.lineWidth = arcStrokeWidth
             ctx.lineCap = "round"
 
-            // Regen color: grey → red transition
+            // Regen color: arc background → regen transition
             if (regenTransition > 0) {
-                var bgR = lerpColor(isDark ? "#424242" : "#E0E0E0", "#4DFF0000", regenTransition)
-                ctx.strokeStyle = bgR
+                ctx.strokeStyle = lerpColor(themeStore.arcBackground, themeStore.speedRegen, regenTransition)
             } else {
-                ctx.strokeStyle = isDark ? "#424242" : "#E0E0E0"
+                ctx.strokeStyle = themeStore.arcBackground
             }
             ctx.stroke()
 
@@ -163,9 +164,9 @@ Item {
                 ctx.arc(cx, cy, r - arcStrokeWidth / 2, startRad, startRad + sweepRad)
                 ctx.lineWidth = arcStrokeWidth
                 ctx.lineCap = "round"
-                ctx.shadowColor = "#F44336"
+                ctx.shadowColor = themeStore.speedError
                 ctx.shadowBlur = 8 + 20 * errorPulse
-                ctx.strokeStyle = "#F44336"
+                ctx.strokeStyle = themeStore.speedError
                 ctx.stroke()
                 ctx.shadowBlur = 0
             }
@@ -184,14 +185,14 @@ Item {
                 // Color based on speed
                 var fillColor
                 if (animatedSpeed > maxArcSpeed) {
-                    // Overspeed: pulse purple ↔ pink
-                    fillColor = lerpColor("#9C27B0", "#E91E63", overspeedPulse)
+                    // Overspeed: pulse between the two overspeed colors
+                    fillColor = lerpColor(themeStore.overspeedA, themeStore.overspeedB, overspeedPulse)
                 } else if (animatedSpeed > 55) {
-                    // Transition zone 55-60: blue → purple
+                    // Transition zone 55-60: accent → high-speed fill
                     var t = (animatedSpeed - 55) / 5
-                    fillColor = lerpColor("#2196F3", "#9C27B0", t)
+                    fillColor = lerpColor(themeStore.accent, themeStore.speedFillHigh, t)
                 } else {
-                    fillColor = "#2196F3"
+                    fillColor = themeStore.accent
                 }
 
                 // Acceleration pulse modifies opacity
@@ -224,7 +225,7 @@ Item {
                 ctx.lineTo(cx + innerR * cosA, cy + innerR * sinA)
                 ctx.lineWidth = tickWidth
                 ctx.lineCap = "butt"
-                ctx.strokeStyle = isDark ? "#80FFFFFF" : "#1F000000"
+                ctx.strokeStyle = themeStore.speedTick
                 ctx.stroke()
             }
 
@@ -242,9 +243,7 @@ Item {
                 var lx = cx + labelR * Math.cos(labelAngle)
                 var ly = cy + labelR * Math.sin(labelAngle)
                 ctx.font = isMajor ? "600 13px Roboto" : "400 9px Roboto"
-                ctx.fillStyle = isMajor
-                    ? (isDark ? "#CCFFFFFF" : "#4D000000")
-                    : (isDark ? "#80FFFFFF" : "#1F000000")
+                ctx.fillStyle = isMajor ? themeStore.speedLabelMajor : themeStore.speedTick
                 ctx.fillText(spd.toString(), lx, ly)
             }
         }
@@ -259,7 +258,7 @@ Item {
         text: speedometer.ecuStale ? "—" : Math.floor(speedometer.animatedSpeed).toString()
         font.pixelSize: themeStore.fontDisplay
         font.weight: Font.Bold
-        color: speedometer.isDark ? "#FFFFFF" : "#000000"
+        color: themeStore.textColor
     }
 
     // km/h — tight below speed number
@@ -270,7 +269,7 @@ Item {
         anchors.topMargin: -12
         text: "km/h"
         font.pixelSize: themeStore.fontTitle
-        color: speedometer.isDark ? "#99FFFFFF" : "#8A000000"
+        color: themeStore.textSecondary
     }
 
     // Road name + speed limit — below km/h. Sits lower in the gap between the
@@ -295,24 +294,9 @@ Item {
 
     // Helper: linear interpolation between two colors
     function lerpColor(c1, c2, t) {
-        // Parse #RRGGBB or #AARRGGBB
-        var offset1 = c1.length > 7 ? 2 : 0
-        var a1 = offset1 ? parseInt(c1.substring(1, 3), 16) / 255 : 1.0
-        var r1 = parseInt(c1.substring(1 + offset1, 3 + offset1), 16)
-        var g1 = parseInt(c1.substring(3 + offset1, 5 + offset1), 16)
-        var b1 = parseInt(c1.substring(5 + offset1, 7 + offset1), 16)
-
-        var offset2 = c2.length > 7 ? 2 : 0
-        var a2 = offset2 ? parseInt(c2.substring(1, 3), 16) / 255 : 1.0
-        var r2 = parseInt(c2.substring(1 + offset2, 3 + offset2), 16)
-        var g2 = parseInt(c2.substring(3 + offset2, 5 + offset2), 16)
-        var b2 = parseInt(c2.substring(5 + offset2, 7 + offset2), 16)
-
-        var r = Math.round(r1 + (r2 - r1) * t)
-        var g = Math.round(g1 + (g2 - g1) * t)
-        var b = Math.round(b1 + (b2 - b1) * t)
-        var a = a1 + (a2 - a1) * t
-
-        return "rgba(" + r + "," + g + "," + b + "," + a.toFixed(3) + ")"
+        return Qt.rgba(c1.r + (c2.r - c1.r) * t,
+                       c1.g + (c2.g - c1.g) * t,
+                       c1.b + (c2.b - c1.b) * t,
+                       c1.a + (c2.a - c1.a) * t)
     }
 }

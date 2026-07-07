@@ -186,7 +186,34 @@ Window {
         }
     }
 
-    Component { id: clusterComponent; ClusterScreen {} }
+    Component {
+        id: clusterComponent
+        // Custom layout pack with built-in fallback. A broken pack can't take
+        // the dashboard down: the Loader errors, the built-in cluster
+        // activates, and the menu overlays live outside this component anyway.
+        Item {
+            // Forward the layout API consumed by BlinkerOverlay (fail-soft there)
+            readonly property real bottomBarHeight: {
+                var it = customCluster.status === Loader.Ready ? customCluster.item
+                                                               : builtinCluster.item
+                return it && typeof it.bottomBarHeight === "number" ? it.bottomBarHeight : 48
+            }
+            Loader {
+                id: customCluster
+                anchors.fill: parent
+                active: layoutStore.clusterSource.toString() !== ""
+                source: layoutStore.clusterSource
+                onStatusChanged: if (status === Loader.Error)
+                    layoutStore.reportLoadError(source.toString())
+            }
+            Loader {
+                id: builtinCluster
+                anchors.fill: parent
+                active: !customCluster.active || customCluster.status === Loader.Error
+                sourceComponent: ClusterScreen {}
+            }
+        }
+    }
     Component { id: mapComponent; MapScreen {} }
     Component { id: maintenanceComponent; MaintenanceScreen {} }
     Component { id: aboutComponent; AboutScreen {} }

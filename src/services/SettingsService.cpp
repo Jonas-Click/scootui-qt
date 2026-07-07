@@ -26,6 +26,16 @@ void SettingsService::updateTheme(const QString &theme)
     writeSetting(QStringLiteral("dashboard.theme"), theme);
 }
 
+void SettingsService::updateColorTheme(const QString &name)
+{
+    writeSetting(QStringLiteral("dashboard.color-theme"), name);
+}
+
+void SettingsService::updateLayout(const QString &name)
+{
+    writeSetting(QStringLiteral("dashboard.layout"), name);
+}
+
 void SettingsService::updateAutoTheme(bool enabled)
 {
     writeSetting(QStringLiteral("dashboard.theme"), enabled ? QStringLiteral("auto") : QStringLiteral("dark"));

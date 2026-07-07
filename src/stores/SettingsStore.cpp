@@ -11,6 +11,8 @@ SyncSettings SettingsStore::syncSettings() const
         QStringLiteral("settings"), 5000,
         {
             {QStringLiteral("theme"), QStringLiteral("dashboard.theme")},
+            {QStringLiteral("colorTheme"), QStringLiteral("dashboard.color-theme")},
+            {QStringLiteral("layout"), QStringLiteral("dashboard.layout")},
             {QStringLiteral("mode"), QStringLiteral("dashboard.mode")},
             {QStringLiteral("backlightMode"), QStringLiteral("dashboard.backlight-mode")},
             {QStringLiteral("showRawSpeed"), QStringLiteral("dashboard.show-raw-speed")},
@@ -49,6 +51,13 @@ void SettingsStore::applyFieldUpdate(const QString &variable, const QString &val
 {
     if (variable == QLatin1String("dashboard.theme")) {
         if (value != m_theme) { m_theme = value; emit themeChanged(); }
+    } else if (variable == QLatin1String("dashboard.color-theme")) {
+        // Empty (key unset in redis) means default
+        const QString v = value.isEmpty() ? QStringLiteral("default") : value;
+        if (v != m_colorTheme) { m_colorTheme = v; emit colorThemeChanged(); }
+    } else if (variable == QLatin1String("dashboard.layout")) {
+        const QString v = value.isEmpty() ? QStringLiteral("default") : value;
+        if (v != m_layout) { m_layout = v; emit layoutChanged(); }
     } else if (variable == QLatin1String("dashboard.mode")) {
         if (value != m_mode) { m_mode = value; emit modeChanged(); }
     } else if (variable == QLatin1String("dashboard.backlight-mode")) {

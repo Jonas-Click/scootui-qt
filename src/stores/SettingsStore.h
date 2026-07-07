@@ -7,6 +7,8 @@ class SettingsStore : public SyncableStore
 {
     Q_OBJECT
     Q_PROPERTY(QString theme READ theme NOTIFY themeChanged)
+    Q_PROPERTY(QString colorTheme READ colorTheme NOTIFY colorThemeChanged)
+    Q_PROPERTY(QString layout READ layout NOTIFY layoutChanged)
     Q_PROPERTY(QString mode READ mode NOTIFY modeChanged)
     Q_PROPERTY(QString backlightMode READ backlightMode NOTIFY backlightModeChanged)
     Q_PROPERTY(bool showRawSpeed READ showRawSpeed NOTIFY showRawSpeedChanged)
@@ -41,6 +43,8 @@ public:
     explicit SettingsStore(MdbRepository *repo, QObject *parent = nullptr);
 
     QString theme() const { return m_theme; }
+    QString colorTheme() const { return m_colorTheme; }
+    QString layout() const { return m_layout; }
     QString mode() const { return m_mode; }
     QString backlightMode() const { return m_backlightMode; }
     bool showRawSpeed() const { return m_showRawSpeed == QLatin1String("true"); }
@@ -77,6 +81,8 @@ public:
 
 signals:
     void themeChanged();
+    void colorThemeChanged();
+    void layoutChanged();
     void modeChanged();
     void backlightModeChanged();
     void showRawSpeedChanged();
@@ -114,6 +120,10 @@ protected:
 private:
     // @schema dashboard.theme
     QString m_theme = QStringLiteral("auto");
+    // @schema dashboard.color-theme
+    QString m_colorTheme = QStringLiteral("default");
+    // @schema dashboard.layout
+    QString m_layout = QStringLiteral("default");
     // @schema dashboard.mode
     QString m_mode = QStringLiteral("speedometer");
     // @schema dashboard.backlight-mode

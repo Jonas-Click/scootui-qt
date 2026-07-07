@@ -2,15 +2,27 @@
 
 #include <QObject>
 #include <QColor>
+#include <QHash>
+#include <QStringList>
+#include <QFileSystemWatcher>
+#include <QTimer>
 
 class SettingsStore;
 
+// Design-token store. Token values come from a color-theme definition:
+// built-in defaults (identical to the historical hardcoded palette) overlaid
+// with the JSON theme selected via dashboard.color-theme. Themes ship in
+// qrc:/ScootUI/assets/themes/ or live in <dataDir>/scootui/themes/*.json.
+// dashboard.theme (auto|dark|light) keeps its meaning: it picks the variant
+// of the active color theme.
 class ThemeStore : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(bool isDark READ isDark NOTIFY themeChanged)
     Q_PROPERTY(QString themeName READ themeName NOTIFY themeChanged)
     Q_PROPERTY(bool isAutoMode READ isAutoMode NOTIFY themeChanged)
+    Q_PROPERTY(QString colorTheme READ colorTheme NOTIFY themeChanged)
+    Q_PROPERTY(QStringList availableThemes READ availableThemes NOTIFY availableThemesChanged)
 
     // Type scale (constant — not theme-dependent)
     Q_PROPERTY(qreal fontDisplay MEMBER s_fontDisplay CONSTANT)
@@ -42,12 +54,22 @@ class ThemeStore : public QObject
     Q_PROPERTY(QColor powerBarBg READ powerBarBg NOTIFY themeChanged)
     Q_PROPERTY(QColor powerZeroMark READ powerZeroMark NOTIFY themeChanged)
 
-    // Semantic status colors (theme-independent — deep shades, white text on top)
-    Q_PROPERTY(QColor statusSuccess READ statusSuccess CONSTANT)
-    Q_PROPERTY(QColor statusWarning READ statusWarning CONSTANT)
-    Q_PROPERTY(QColor statusError   READ statusError   CONSTANT)
-    Q_PROPERTY(QColor statusNeutral READ statusNeutral CONSTANT)
-    Q_PROPERTY(QColor statusInfo    READ statusInfo    CONSTANT)
+    // Accent + speedometer palette
+    Q_PROPERTY(QColor accent READ accent NOTIFY themeChanged)
+    Q_PROPERTY(QColor speedFillHigh READ speedFillHigh NOTIFY themeChanged)
+    Q_PROPERTY(QColor overspeedA READ overspeedA NOTIFY themeChanged)
+    Q_PROPERTY(QColor overspeedB READ overspeedB NOTIFY themeChanged)
+    Q_PROPERTY(QColor speedRegen READ speedRegen NOTIFY themeChanged)
+    Q_PROPERTY(QColor speedError READ speedError NOTIFY themeChanged)
+    Q_PROPERTY(QColor speedTick READ speedTick NOTIFY themeChanged)
+    Q_PROPERTY(QColor speedLabelMajor READ speedLabelMajor NOTIFY themeChanged)
+
+    // Semantic status colors (deep shades, white text on top)
+    Q_PROPERTY(QColor statusSuccess READ statusSuccess NOTIFY themeChanged)
+    Q_PROPERTY(QColor statusWarning READ statusWarning NOTIFY themeChanged)
+    Q_PROPERTY(QColor statusError   READ statusError   NOTIFY themeChanged)
+    Q_PROPERTY(QColor statusNeutral READ statusNeutral NOTIFY themeChanged)
+    Q_PROPERTY(QColor statusInfo    READ statusInfo    NOTIFY themeChanged)
 
 public:
     explicit ThemeStore(SettingsStore *settings, QObject *parent = nullptr);
@@ -55,37 +77,78 @@ public:
     bool isDark() const { return m_isDark; }
     bool isAutoMode() const { return m_isAutoMode; }
     QString themeName() const { return m_isDark ? QStringLiteral("dark") : QStringLiteral("light"); }
+    QString colorTheme() const { return m_colorTheme; }
+    QStringList availableThemes() const { return m_availableThemes; }
 
-    QColor textColor() const { return m_isDark ? QColor(255,255,255) : QColor(0,0,0); }
-    QColor textSecondary() const { return m_isDark ? QColor(255,255,255,153) : QColor(0,0,0,138); }
-    QColor textTertiary() const { return m_isDark ? QColor(255,255,255,77) : QColor(0,0,0,31); }
-    QColor textHint() const { return m_isDark ? QColor(255,255,255,138) : QColor(0,0,0,97); }
-    QColor backgroundColor() const { return m_isDark ? QColor(0,0,0) : QColor(255,255,255); }
-    QColor surfaceColor() const { return m_isDark ? QColor(0x1E,0x1E,0x1E) : QColor(0xF5,0xF5,0xF5); }
-    QColor borderColor() const { return m_isDark ? QColor(255,255,255,26) : QColor(0,0,0,31); }
-    QColor arcBackground() const { return m_isDark ? QColor(0x42,0x42,0x42) : QColor(0xE0,0xE0,0xE0); }
-    QColor powerBarBg() const { return m_isDark ? QColor(0x42,0x42,0x42) : QColor(0xE0,0xE0,0xE0); }
-    QColor powerZeroMark() const { return m_isDark ? QColor(255,255,255,102) : QColor(0,0,0,97); }
+    QColor textColor() const { return pick("text"); }
+    QColor textSecondary() const { return pick("textSecondary"); }
+    QColor textTertiary() const { return pick("textTertiary"); }
+    QColor textHint() const { return pick("textHint"); }
+    QColor backgroundColor() const { return pick("background"); }
+    QColor surfaceColor() const { return pick("surface"); }
+    QColor borderColor() const { return pick("border"); }
+    QColor arcBackground() const { return pick("arcBackground"); }
+    QColor powerBarBg() const { return pick("powerBarBg"); }
+    QColor powerZeroMark() const { return pick("powerZeroMark"); }
 
-    // Material 800/900 — readable with white text in both themes
-    QColor statusSuccess() const { return QColor(0x2E,0x7D,0x32); }  // Green 800
-    QColor statusWarning() const { return QColor(0xE6,0x51,0x00); }  // Orange 900
-    QColor statusError()   const { return QColor(0xC6,0x28,0x28); }  // Red 800
-    QColor statusNeutral() const { return QColor(0x42,0x42,0x42); }  // Grey 800
-    QColor statusInfo()    const { return QColor(0x15,0x65,0xC0); }  // Blue 800
+    QColor accent() const { return pick("accent"); }
+    QColor speedFillHigh() const { return pick("speedFillHigh"); }
+    QColor overspeedA() const { return pick("overspeedA"); }
+    QColor overspeedB() const { return pick("overspeedB"); }
+    QColor speedRegen() const { return pick("speedRegen"); }
+    QColor speedError() const { return pick("speedError"); }
+    QColor speedTick() const { return pick("speedTick"); }
+    QColor speedLabelMajor() const { return pick("speedLabelMajor"); }
+
+    QColor statusSuccess() const { return pick("statusSuccess"); }
+    QColor statusWarning() const { return pick("statusWarning"); }
+    QColor statusError()   const { return pick("statusError"); }
+    QColor statusNeutral() const { return pick("statusNeutral"); }
+    QColor statusInfo()    const { return pick("statusInfo"); }
+
+    // Per-theme map style path (empty = use the built-in qrc style)
+    QString mapStyle(bool dark) const { return dark ? m_mapStyleDark : m_mapStyleLight; }
 
     Q_INVOKABLE void setTheme(const QString &theme);
+    // Token lookup by name — escape hatch for layout packs
+    Q_INVOKABLE QColor token(const QString &name) const { return pick(name.toUtf8().constData()); }
+    Q_INVOKABLE void rescanThemes();
 
 signals:
     void themeChanged();
+    void availableThemesChanged();
+    void themeLoadFailed(const QString &message);
 
 private slots:
     void onSettingsThemeChanged();
+    void onColorThemeChanged();
 
 private:
+    QColor pick(const char *tokenName) const;
+    void applyColorTheme(const QString &name);
+    bool loadThemeFile(const QString &path, QString *error);
+    QString resolveThemePath(const QString &name) const;
+    void setupWatcher();
+    void updateWatchedPaths();
+    static QString userThemesDir();
+    static const QHash<QString, QColor> &defaults(bool dark);
+
     SettingsStore *m_settings;
     bool m_isDark = true;
     bool m_isAutoMode = false;
+
+    QString m_colorTheme = QStringLiteral("default");
+    QString m_requestedTheme = QStringLiteral("default");
+    QStringList m_availableThemes;
+    QHash<QString, QColor> m_dark;
+    QHash<QString, QColor> m_light;
+    QString m_mapStyleDark;
+    QString m_mapStyleLight;
+    QString m_activeThemeFile;   // filesystem path of the active theme, if any
+
+    QFileSystemWatcher m_watcher;
+    QTimer m_reloadTimer;
+    QTimer m_dirPollTimer;   // waits for the user themes dir to appear (late /data mount)
 
     // Type scale constants
     static constexpr qreal s_fontDisplay = 96;

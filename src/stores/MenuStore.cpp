@@ -3,6 +3,7 @@
 #include "SettingsStore.h"
 #include "VehicleStore.h"
 #include "ThemeStore.h"
+#include "LayoutStore.h"
 #include "TripStore.h"
 #include "ScreenStore.h"
 #include "SavedLocationsStore.h"
@@ -37,6 +38,9 @@ MenuStore::MenuStore(SettingsStore *settings, VehicleStore *vehicle,
 {
     // Rebuild menu when settings or language change
     connect(m_settings, &SettingsStore::themeChanged, this, &MenuStore::rebuildMenuTree);
+    connect(m_settings, &SettingsStore::colorThemeChanged, this, &MenuStore::rebuildMenuTree);
+    connect(m_settings, &SettingsStore::layoutChanged, this, &MenuStore::rebuildMenuTree);
+    connect(m_theme, &ThemeStore::availableThemesChanged, this, &MenuStore::rebuildMenuTree);
     connect(m_settings, &SettingsStore::languageChanged, this, &MenuStore::rebuildMenuTree);
     connect(m_settings, &SettingsStore::blinkerStyleChanged, this, &MenuStore::rebuildMenuTree);
     connect(m_settings, &SettingsStore::dualBatteryChanged, this, &MenuStore::rebuildMenuTree);
@@ -154,6 +158,16 @@ void MenuStore::setFaultsStore(FaultsStore *store)
 void MenuStore::setToastService(ToastService *svc)
 {
     m_toastService = svc;
+}
+
+void MenuStore::setLayoutStore(LayoutStore *store)
+{
+    m_layoutStore = store;
+    if (m_layoutStore) {
+        connect(m_layoutStore, &LayoutStore::availableLayoutsChanged,
+                this, &MenuStore::rebuildMenuTree);
+        rebuildMenuTree();
+    }
 }
 
 void MenuStore::rebuildMenuTree()
@@ -415,6 +429,34 @@ void MenuStore::rebuildMenuTree()
                 {tr->menuThemeDark(), [svc]() { svc->updateTheme(QStringLiteral("dark")); }},
                 {tr->menuThemeLight(), [svc]() { svc->updateTheme(QStringLiteral("light")); }},
             }, themeIdx));
+    }
+
+    // Color theme (built-in palettes + /data/scootui/themes/*.json).
+    // Only shown when there's something to choose from.
+    {
+        const QStringList themes = m_theme->availableThemes();
+        if (themes.size() > 1) {
+            QList<CycleOption> options;
+            for (const QString &name : themes)
+                options.append({name, [svc, name]() { svc->updateColorTheme(name); }});
+            int idx = themes.indexOf(settings->colorTheme());
+            settingsNode->addChild(MenuNode::cycleSetting(QStringLiteral("settings_color_theme"),
+                tr->menuColorTheme(), options, qMax(0, idx)));
+        }
+    }
+
+    // Layout packs (/data/scootui/layouts/<name>/). Only shown when at
+    // least one pack is installed.
+    if (m_layoutStore) {
+        const QStringList layouts = m_layoutStore->availableLayouts();
+        if (layouts.size() > 1) {
+            QList<CycleOption> options;
+            for (const QString &name : layouts)
+                options.append({name, [svc, name]() { svc->updateLayout(name); }});
+            int idx = layouts.indexOf(settings->layout());
+            settingsNode->addChild(MenuNode::cycleSetting(QStringLiteral("settings_layout"),
+                tr->menuLayout(), options, qMax(0, idx)));
+        }
     }
 
     // Backlight (inline cycle: Auto -> Low -> Medium -> High). Auto = ambient

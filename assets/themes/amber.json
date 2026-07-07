@@ -1,0 +1,20 @@
+{
+    "name": "Amber",
+    "author": "Librescoot",
+    "schemaVersion": 1,
+    "dark": {
+        "accent": "#FFB300",
+        "speedFillHigh": "#FF6F00",
+        "overspeedA": "#FF6F00",
+        "overspeedB": "#FF3D00",
+        "surface": "#211A0E",
+        "arcBackground": "#4E4437",
+        "powerBarBg": "#4E4437"
+    },
+    "light": {
+        "accent": "#FF8F00",
+        "speedFillHigh": "#E65100",
+        "overspeedA": "#E65100",
+        "overspeedB": "#DD2C00"
+    }
+}

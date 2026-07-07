@@ -35,7 +35,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         height: parent.height * 0.3
-        color: "#2196F3"
+        color: themeStore.accent
         opacity: 0.8
 
         Column {

@@ -23,6 +23,7 @@
 #include "stores/CbBatteryStore.h"
 #include "stores/AuxBatteryStore.h"
 #include "stores/ThemeStore.h"
+#include "stores/LayoutStore.h"
 #include "stores/ScreenStore.h"
 #include "stores/MenuStore.h"
 #include "stores/HopOnStore.h"
@@ -192,6 +193,7 @@ void Application::createStores(QQmlApplicationEngine &engine)
     auto *cbBatteryStore = new CbBatteryStore(repo, this);
     auto *auxBatteryStore = new AuxBatteryStore(repo, this);
     auto *themeStore = new ThemeStore(settingsStore, this);
+    auto *layoutStore = new LayoutStore(settingsStore, &engine, this);
     auto *screenStore = new ScreenStore(settingsStore, repo, this);
     auto *tripStore = new TripStore(engineStore, vehicleStore, this);
     m_shutdownStore = new ShutdownStore(this);
@@ -220,6 +222,14 @@ void Application::createStores(QQmlApplicationEngine &engine)
     // M7: Navigation service
     m_navigationService = new NavigationService(gpsStore, navigationStore, vehicleStore,
                                                  settingsStore, speedLimitStore, repo, this);
+
+    // Surface color-theme / layout-pack problems as a toast
+    connect(themeStore, &ThemeStore::themeLoadFailed, this, [this](const QString &msg) {
+        m_toastService->showWarning(msg);
+    });
+    connect(layoutStore, &LayoutStore::layoutLoadFailed, this, [this](const QString &msg) {
+        m_toastService->showWarning(msg);
+    });
 
     // Show toast on navigation errors so the user knows what went wrong
     connect(m_navigationService, &NavigationService::errorChanged, this, [this]() {
@@ -474,6 +484,7 @@ void Application::createStores(QQmlApplicationEngine &engine)
     menuStore->setNavigationService(m_navigationService);
     menuStore->setNavigationAvailabilityService(m_navAvailability);
     menuStore->setInternetStore(internetStore);
+    menuStore->setLayoutStore(layoutStore);
 
     // Hop-on / hop-off store: combo learning, matching, lock screen.
     auto *hopOnStore = new HopOnStore(vehicleStore, settingsStore,
@@ -540,6 +551,7 @@ void Application::createStores(QQmlApplicationEngine &engine)
     ctx->setContextProperty(QStringLiteral("cbBatteryStore"), cbBatteryStore);
     ctx->setContextProperty(QStringLiteral("auxBatteryStore"), auxBatteryStore);
     ctx->setContextProperty(QStringLiteral("themeStore"), themeStore);
+    ctx->setContextProperty(QStringLiteral("layoutStore"), layoutStore);
     ctx->setContextProperty(QStringLiteral("screenStore"), screenStore);
     ctx->setContextProperty(QStringLiteral("menuStore"), menuStore);
     ctx->setContextProperty(QStringLiteral("hopOnStore"), hopOnStore);

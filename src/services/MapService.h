@@ -140,11 +140,11 @@ private:
     // Diffs the embedded dark/light style JSONs once and fills m_mapThemeLayers
     // with the per-layer paint properties that differ between the two themes.
     void buildThemeLayerOverrides();
-    QString rewriteStyleForMbtiles(const QString &qrcPath, const QString &mbtilesPath);
+    QString rewriteStyleForMbtiles(const QString &stylePath, const QString &mbtilesPath);
 
     // Traffic overlay
     static void removeTrafficFromStyle(QJsonObject &root);
-    QString rewriteStyleStripTraffic(const QString &qrcPath);
+    QString rewriteStyleStripTraffic(const QString &stylePath);
 
     // Route GeoJSON for native MapLibre layer
     void updateRouteGeoJson();

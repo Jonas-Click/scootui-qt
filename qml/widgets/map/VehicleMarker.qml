@@ -21,7 +21,7 @@ Item {
     readonly property real activeCircleSize: hasRecentFix ? ephCircleSize : drCircleSize
 
     // Colors
-    readonly property color arrowColor: hasRecentFix ? "#2196F3" : "#888888"
+    readonly property color arrowColor: hasRecentFix ? themeStore.accent : "#888888"
     readonly property color circleColor: hasRecentFix
         ? (isDark ? Qt.rgba(0.26, 0.26, 0.26, 0.7) : Qt.rgba(0.88, 0.88, 0.88, 0.7))
         : Qt.rgba(0.5, 0.5, 0.5, 0.5)

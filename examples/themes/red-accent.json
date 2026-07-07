@@ -1,0 +1,7 @@
+{
+    "name": "Red Accent",
+    "author": "Librescoot",
+    "schemaVersion": 1,
+    "dark":  { "accent": "#E53935" },
+    "light": { "accent": "#C62828" }
+}

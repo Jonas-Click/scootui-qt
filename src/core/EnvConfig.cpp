@@ -3,6 +3,7 @@
 
 #include <QProcessEnvironment>
 #include <QDebug>
+#include <QDir>
 #include <algorithm>
 
 void EnvConfig::initialize()
@@ -34,6 +35,21 @@ void EnvConfig::initialize()
                 qWarning() << "Invalid SCOOTUI_RESOLUTION:" << resStr;
             }
         }
+    }
+
+    // User content root: SCOOTUI_DATA_DIR (themes, layouts)
+    const QString dataDirStr = env.value(QStringLiteral("SCOOTUI_DATA_DIR"));
+    if (!dataDirStr.isEmpty()) {
+        m_dataDir = dataDirStr;
+        qDebug() << "Data dir:" << m_dataDir;
+    }
+
+    // Filesystem layout packs aren't AOT-compiled like the qrc QML; persist
+    // the JIT cache so the DBC pays the compile once, not every boot.
+    if (!env.contains(QStringLiteral("QML_DISK_CACHE_PATH"))) {
+        const QString cacheDir = m_dataDir + QStringLiteral("/scootui/.qmlcache");
+        if (QDir(m_dataDir).exists() && QDir().mkpath(cacheDir))
+            qputenv("QML_DISK_CACHE_PATH", cacheDir.toUtf8());
     }
 
     // Redis host: SCOOTUI_REDIS_HOST=host:port or just host
