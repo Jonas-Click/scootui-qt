@@ -12,6 +12,7 @@ private slots:
     void perSetFlagsRoundTrip();
     void falseFlagsAreOmitted();
     void legacyCombinedFlagWidensToBothSets();
+    void regionNameRoundTrip();
 };
 
 void MapMetadataTest::perSetFlagsRoundTrip()
@@ -64,6 +65,21 @@ void MapMetadataTest::legacyCombinedFlagWidensToBothSets()
     idle.normaliseUpdateTargets();
     QCOMPARE(idle.displayUpdateAvailable, false);
     QCOMPARE(idle.routingUpdateAvailable, false);
+}
+
+void MapMetadataTest::regionNameRoundTrip()
+{
+    MapMetadata meta;
+    meta.region = QStringLiteral("zurich");
+    meta.regionName = QStringLiteral("Kanton Zürich");
+    const auto restored = MapMetadata::fromJson(meta.toJson());
+    QCOMPARE(restored.region, meta.region);
+    QCOMPARE(restored.regionName, meta.regionName);
+
+    const auto older = MapMetadata::fromJson(QJsonObject{
+        {QStringLiteral("region"), QStringLiteral("bayern")},
+    });
+    QVERIFY(older.regionName.isEmpty());
 }
 
 QTEST_GUILESS_MAIN(MapMetadataTest)

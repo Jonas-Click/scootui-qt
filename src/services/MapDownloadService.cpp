@@ -1,11 +1,11 @@
 #include "MapDownloadService.h"
 
 #include "repositories/MdbRepository.h"
+#include "services/MapRegionResolver.h"
 #include "utils/ZstdDecompressor.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
-#include <QJsonArray>
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
@@ -23,52 +23,6 @@
 // QFuture reports progress as an int, so the decompression pass scales its
 // byte count into this many steps before handing it over.
 static constexpr int DecompressProgressSteps = 10000;
-
-const QHash<QString, QString> MapDownloadService::s_stateToSlug = {
-    {QStringLiteral("Baden-Württemberg"), QStringLiteral("baden-wuerttemberg")},
-    {QStringLiteral("Bayern"), QStringLiteral("bayern")},
-    {QStringLiteral("Berlin"), QStringLiteral("berlin_brandenburg")},
-    {QStringLiteral("Brandenburg"), QStringLiteral("berlin_brandenburg")},
-    {QStringLiteral("Bremen"), QStringLiteral("bremen")},
-    {QStringLiteral("Hamburg"), QStringLiteral("hamburg")},
-    {QStringLiteral("Hessen"), QStringLiteral("hessen")},
-    {QStringLiteral("Mecklenburg-Vorpommern"), QStringLiteral("mecklenburg-vorpommern")},
-    {QStringLiteral("Niedersachsen"), QStringLiteral("niedersachsen")},
-    {QStringLiteral("Nordrhein-Westfalen"), QStringLiteral("nordrhein-westfalen")},
-    {QStringLiteral("Rheinland-Pfalz"), QStringLiteral("rheinland-pfalz")},
-    {QStringLiteral("Saarland"), QStringLiteral("saarland")},
-    {QStringLiteral("Sachsen"), QStringLiteral("sachsen")},
-    {QStringLiteral("Sachsen-Anhalt"), QStringLiteral("sachsen-anhalt")},
-    {QStringLiteral("Schleswig-Holstein"), QStringLiteral("schleswig-holstein")},
-    {QStringLiteral("Thüringen"), QStringLiteral("thueringen")},
-};
-
-// Display names for every slug the tile repos publish. Kept apart from
-// s_stateToSlug because that one is keyed on what Nominatim returns for a
-// German state and is used to resolve a position; this one only ever renders.
-// Regions outside Germany have no Nominatim entry and so appear only here.
-static const QHash<QString, QString> s_slugToDisplayName = {
-    {QStringLiteral("baden-wuerttemberg"), QStringLiteral("Baden-Württemberg")},
-    {QStringLiteral("bayern"), QStringLiteral("Bayern")},
-    {QStringLiteral("belgium"), QStringLiteral("Belgium")},
-    {QStringLiteral("berlin_brandenburg"), QStringLiteral("Berlin & Brandenburg")},
-    {QStringLiteral("bremen"), QStringLiteral("Bremen")},
-    {QStringLiteral("hamburg"), QStringLiteral("Hamburg")},
-    {QStringLiteral("hessen"), QStringLiteral("Hessen")},
-    {QStringLiteral("ile-de-france"), QStringLiteral("Île-de-France")},
-    {QStringLiteral("italy-nord-ovest"), QStringLiteral("Italy (North-West)")},
-    {QStringLiteral("luxembourg"), QStringLiteral("Luxembourg")},
-    {QStringLiteral("mecklenburg-vorpommern"), QStringLiteral("Mecklenburg-Vorpommern")},
-    {QStringLiteral("netherlands"), QStringLiteral("Netherlands")},
-    {QStringLiteral("niedersachsen"), QStringLiteral("Niedersachsen (incl. Bremen)")},
-    {QStringLiteral("nordrhein-westfalen"), QStringLiteral("Nordrhein-Westfalen")},
-    {QStringLiteral("rheinland-pfalz"), QStringLiteral("Rheinland-Pfalz")},
-    {QStringLiteral("saarland"), QStringLiteral("Saarland")},
-    {QStringLiteral("sachsen"), QStringLiteral("Sachsen")},
-    {QStringLiteral("sachsen-anhalt"), QStringLiteral("Sachsen-Anhalt")},
-    {QStringLiteral("schleswig-holstein"), QStringLiteral("Schleswig-Holstein")},
-    {QStringLiteral("thueringen"), QStringLiteral("Thüringen")},
-};
 
 MapDownloadService::MapDownloadService(MdbRepository *repo, QObject *parent)
     : QObject(parent)
@@ -503,6 +457,17 @@ void MapDownloadService::fetchTilesManifest(std::function<void(const QJsonObject
                 region.insert(QStringLiteral("valhalla"), region.value(QStringLiteral("routing")));
                 normalized.insert(it.key(), region);
             }
+            if (m_status != ScootEnums::MapDownloadStatus::Locating
+                && m_metadata.region == m_resolvedSlug) {
+                const QString name = normalized.value(m_resolvedSlug).toObject()
+                                         .value(QStringLiteral("name")).toString();
+                if (!name.isEmpty() && name != m_metadata.regionName) {
+                    m_metadata.regionName = name;
+                    m_regionName = name;
+                    persistMetadata();
+                    emit regionNameChanged();
+                }
+            }
             callback(normalized);
             return;
         }
@@ -525,80 +490,70 @@ void MapDownloadService::fetchTilesManifest(std::function<void(const QJsonObject
 void MapDownloadService::doResolveSlug(double lat, double lng)
 {
     const quint64 generation = m_operationGeneration;
-    QString url = QStringLiteral("https://nominatim.openstreetmap.org/reverse?lat=%1&lon=%2&format=json&zoom=5")
-                      .arg(lat, 0, 'f', 6).arg(lng, 0, 'f', 6);
-
-    QNetworkRequest req{QUrl{url}};
-    req.setRawHeader("User-Agent", "Librescoot/1.0");
-    // s_stateToSlug only knows German state names; force Nominatim to return
-    // those regardless of the device's system locale.
-    req.setRawHeader("Accept-Language", "de");
-    req.setTransferTimeout(10000);
-
-    auto *reply = m_nam->get(req);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, generation]() {
-        reply->deleteLater();
+    fetchTilesManifest([this, generation, lat, lng](const QJsonObject &manifest) {
         if (!isCurrentOperation(generation)) return;
-
-        if (reply->error() != QNetworkReply::NoError) {
+        auto fail = [this](const QString &message) {
             if (m_pendingUpdateCheck) {
                 m_pendingUpdateCheck = false;
                 emit updateCheckCompleted(false);
             }
-            setError(QStringLiteral("Could not detect region: network error"));
+            setError(message);
+        };
+        if (manifest.isEmpty()) {
+            fail(QStringLiteral("Could not detect region: map index unavailable"));
             return;
         }
 
-        auto doc = QJsonDocument::fromJson(reply->readAll());
-        auto address = doc.object()[QStringLiteral("address")].toObject();
-        QString state = address[QStringLiteral("state")].toString();
-        if (state.isEmpty())
-            state = address[QStringLiteral("city")].toString();
+        const QString url = QStringLiteral("https://nominatim.openstreetmap.org/reverse?lat=%1&lon=%2&format=json&zoom=10")
+                                .arg(lat, 0, 'f', 6).arg(lng, 0, 'f', 6);
+        QNetworkRequest req{QUrl{url}};
+        req.setRawHeader("User-Agent", "Librescoot/1.0");
+        req.setRawHeader("Accept-Language", "de");
+        req.setTransferTimeout(10000);
 
-        QString slug = slugForState(state);
-        if (slug.isEmpty()) {
+        auto *reply = m_nam->get(req);
+        connect(reply, &QNetworkReply::finished, this, [this, reply, generation, manifest, fail]() {
+            reply->deleteLater();
+            if (!isCurrentOperation(generation)) return;
+            if (reply->error() != QNetworkReply::NoError) {
+                fail(QStringLiteral("Could not detect region: network error"));
+                return;
+            }
+
+            const auto address = QJsonDocument::fromJson(reply->readAll()).object()
+                                     .value(QStringLiteral("address")).toObject();
+            const QString slug = MapRegionResolver::resolve(address, manifest);
+            if (slug.isEmpty()) {
+                const QString place = address.value(QStringLiteral("state")).toString(
+                    address.value(QStringLiteral("city")).toString());
+                fail(QStringLiteral("Unsupported region: ") + place);
+                return;
+            }
+
+            m_resolvedSlug = slug;
+            m_regionName = manifest.value(slug).toObject().value(QStringLiteral("name")).toString();
+            if (m_regionName.isEmpty()) m_regionName = displayNameForSlug(slug);
+            emit regionNameChanged();
+            if (m_metadata.region != slug || m_metadata.regionName != m_regionName) {
+                m_metadata.region = slug;
+                m_metadata.regionName = m_regionName;
+                persistMetadata();
+            }
+
             if (m_pendingUpdateCheck) {
                 m_pendingUpdateCheck = false;
-                emit updateCheckCompleted(false);
+                setStatus(ScootEnums::MapDownloadStatus::Idle);
+                checkForUpdates();
+                return;
             }
-            setError(QStringLiteral("Unsupported region: ") + state);
-            return;
-        }
-
-        m_resolvedSlug = slug;
-        if (slug == QLatin1String("berlin_brandenburg"))
-            m_regionName = QStringLiteral("Berlin/Brandenburg");
-        else if (slug == QLatin1String("niedersachsen"))
-            m_regionName = QStringLiteral("Niedersachsen (incl. Bremen)");
-        else
-            m_regionName = state;
-        emit regionNameChanged();
-
-        // Persist as soon as it is known. Previously the region was only
-        // written after a completed download, so resolving it and then not
-        // downloading meant re-resolving on the next boot.
-        if (m_metadata.region != m_resolvedSlug) {
-            m_metadata.region = m_resolvedSlug;
-            persistMetadata();
-        }
-
-        if (m_pendingUpdateCheck) {
-            m_pendingUpdateCheck = false;
-            setStatus(ScootEnums::MapDownloadStatus::Idle);
-            checkForUpdates();
-            return;
-        }
-
-        // If we were just resolving (not downloading), fetch sizes then go idle
-        if (!m_needsDisplay && !m_needsRouting) {
-            fetchEstimates();
-            return;
-        }
-
-        // Continue to fetch releases
-        setStatus(ScootEnums::MapDownloadStatus::CheckingUpdates);
-        if (!isCurrentOperation(generation)) return;
-        doFetchReleases(m_needsDisplay, m_needsRouting);
+            if (!m_needsDisplay && !m_needsRouting) {
+                fetchEstimates();
+                return;
+            }
+            setStatus(ScootEnums::MapDownloadStatus::CheckingUpdates);
+            if (!isCurrentOperation(generation)) return;
+            doFetchReleases(m_needsDisplay, m_needsRouting);
+        });
     });
 }
 
@@ -1168,18 +1123,17 @@ void MapDownloadService::doFinishAll()
 
 // --- Helpers ---
 
-QString MapDownloadService::slugForState(const QString &state) const
-{
-    return s_stateToSlug.value(state);
-}
-
 QString MapDownloadService::displayNameForSlug(const QString &slug) const
 {
     if (slug.isEmpty())
         return {};
-    // A slug the tile repos added since this build shipped still renders, just
-    // without the prettifying.
-    return s_slugToDisplayName.value(slug, slug);
+    if (slug == m_metadata.region && !m_metadata.regionName.isEmpty())
+        return m_metadata.regionName;
+    QString name = slug;
+    name.replace(QLatin1Char('-'), QLatin1Char(' '));
+    name.replace(QLatin1Char('_'), QLatin1Char(' '));
+    name[0] = name.at(0).toUpper();
+    return name;
 }
 
 QString MapDownloadService::mapsDir() const
@@ -1287,8 +1241,10 @@ bool MapDownloadService::adoptRegionFromManifest(const QJsonObject &manifest)
         if ((!displayDigest.isEmpty() && displayDigest == mapSha)
             || (!routingDigest.isEmpty() && routingDigest == valhallaSha)) {
             m_resolvedSlug = it.key();
-            m_regionName = displayNameForSlug(m_resolvedSlug);
+            m_regionName = region.value(QStringLiteral("name")).toString();
+            if (m_regionName.isEmpty()) m_regionName = displayNameForSlug(m_resolvedSlug);
             m_metadata.region = m_resolvedSlug;
+            m_metadata.regionName = m_regionName;
             persistMetadata();
             emit regionNameChanged();
             qDebug() << "Identified installed region from tile digests:" << m_resolvedSlug;

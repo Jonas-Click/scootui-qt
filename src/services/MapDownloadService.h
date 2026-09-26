@@ -154,7 +154,6 @@ private:
     bool adoptRegionFromManifest(const QJsonObject &manifest);
 
     // Helpers
-    QString slugForState(const QString &state) const;
     QString displayNameForSlug(const QString &slug) const;
     QString mapsDir() const;
     QString downloadDir() const;
@@ -230,6 +229,4 @@ private:
     // can decline the same artifact when the manifest offers it again; a newly
     // published one has a different digest and is tried normally.
     QString m_rejectedCompressedDigest;
-
-    static const QHash<QString, QString> s_stateToSlug;
 };

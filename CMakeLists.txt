@@ -1173,6 +1173,14 @@ if(BUILD_TESTING)
     target_link_libraries(map_metadata_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME map_metadata_test COMMAND map_metadata_test)
 
+    qt_add_executable(map_region_resolver_test
+        tests/MapRegionResolverTest.cpp
+        src/services/MapRegionResolver.h
+    )
+    target_include_directories(map_region_resolver_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(map_region_resolver_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME map_region_resolver_test COMMAND map_region_resolver_test)
+
     qt_add_executable(notification_service_test
         tests/NotificationServiceTest.cpp
         src/services/ToastService.cpp
