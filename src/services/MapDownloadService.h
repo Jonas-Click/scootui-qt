@@ -77,6 +77,7 @@ public:
     // Files on disk, not bookkeeping: maps installed by the flasher are just as
     // installed as ones this service downloaded.
     bool hasMapsInstalled() const;
+    bool hasRoutingTilesInstalled() const;
     bool hasResolvedRegion() const { return !m_resolvedSlug.isEmpty(); }
     // Re-read /data/maps/metadata.json. The constructor runs before /data is
     // mounted, so its read always comes back empty; call this once the

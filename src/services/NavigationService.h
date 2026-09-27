@@ -11,6 +11,7 @@
 #include "services/RoutePlanRpc.h"
 #include <QJsonObject>
 #include <QHash>
+#include <functional>
 
 class GpsStore;
 class NavigationStore;
@@ -223,6 +224,9 @@ public:
     // nav↔map circular dependency). NavigationService subscribes to
     // vehiclePositionChanged to keep TBT in sync with dead reckoning.
     void setMapService(MapService *map);
+    void setRoutingTilesAvailable(std::function<bool()> available) {
+        m_routingTilesAvailable = std::move(available);
+    }
 
     // Route waypoints for MapService dead reckoning
     QList<LatLng> routeWaypoints() const { return m_route.waypoints; }
@@ -286,6 +290,7 @@ private:
     // successful route or a new destination, so a failure with no route to
     // fall back on would pin the error pill over the map indefinitely.
     void raiseError(const QString &message);
+    bool missingLocalRoutingTiles() const;
     // Drop the error state again, either because the linger expired or because
     // the underlying condition resolved.
     void clearError();
@@ -367,6 +372,7 @@ private:
     SpeedLimitStore *m_speedLimit;
     ValhallaClient *m_valhalla;
     MapService *m_map = nullptr;
+    std::function<bool()> m_routingTilesAvailable;
 
     // Exact integer division of the 20 Hz estimator tick avoids elapsed-time
     // jitter turning a nominal 5 Hz update into an alternating 4/5 Hz beat.

@@ -506,6 +506,9 @@ void Application::createStores(QQmlApplicationEngine &engine)
     // Map download service. Takes the repository so it can mirror what is
     // installed into the `maps` hash on the MDB.
     m_mapDownloadService = new MapDownloadService(repo, this);
+    m_navigationService->setRoutingTilesAvailable([this]() {
+        return m_mapDownloadService->hasRoutingTilesInstalled();
+    });
     // The service reads metadata.json and publishes the maps hash in its
     // constructor, before /data is mounted on a cold DBC boot. The mbtiles
     // watcher below cannot see the mount (inotify has no event for it), so

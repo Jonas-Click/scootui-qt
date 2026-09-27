@@ -35,6 +35,7 @@ private slots:
     void unavailableOwnerReportsErrorWithoutBlocking();
     void unavailableOwnerRestoreStaysSilent();
     void keepStopIsDurableAndClearedOnDismount();
+    void missingRoutingTilesReportsSpecificError();
 
 private:
     struct Fixture {
@@ -79,6 +80,37 @@ private:
             .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate)));
     }
 };
+
+void NavigationHopTest::missingRoutingTilesReportsSpecificError()
+{
+    Fixture f;
+    bool tilesInstalled = false;
+    f.nav.setRoutingTilesAvailable([&tilesInstalled]() { return tilesInstalled; });
+    auto *client = f.nav.findChild<ValhallaClient *>();
+    QVERIFY(client);
+
+    client->requestRejected(ValhallaClient::Reason::Initial,
+                            ValhallaClient::RejectionCause::Unhealthy);
+    QCOMPARE(f.nav.errorMessage(),
+             QStringLiteral("Navigation requested but no routing tiles installed."));
+
+    QMetaObject::invokeMethod(&f.nav, "onRouteError", Q_ARG(QString, QStringLiteral("Routing failed")));
+    QCOMPARE(f.nav.errorMessage(),
+             QStringLiteral("Navigation requested but no routing tiles installed."));
+
+    tilesInstalled = true;
+    client->requestRejected(ValhallaClient::Reason::Destination,
+                            ValhallaClient::RejectionCause::Unhealthy);
+    QCOMPARE(f.nav.errorMessage(), QStringLiteral("Cannot reach routing server"));
+
+    tilesInstalled = false;
+    client->setEndpoint(QStringLiteral("https://example.org/"));
+    client->requestRejected(ValhallaClient::Reason::Initial,
+                            ValhallaClient::RejectionCause::Unhealthy);
+    QCOMPARE(f.nav.errorMessage(), QStringLiteral("Cannot reach routing server"));
+    QMetaObject::invokeMethod(&f.nav, "onRouteError", Q_ARG(QString, QStringLiteral("Remote route error")));
+    QCOMPARE(f.nav.errorMessage(), QStringLiteral("Remote route error"));
+}
 
 void NavigationHopTest::twoImmediateAppendsRetainBothStops()
 {

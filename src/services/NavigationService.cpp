@@ -1683,7 +1683,9 @@ void NavigationService::onRouteError(const QString &error)
                    << error;
         return;
     }
-    raiseError(error);
+    raiseError(missingLocalRoutingTiles()
+                   ? QStringLiteral("Navigation requested but no routing tiles installed.")
+                   : error);
     qWarning() << "NavigationService: route error -" << error;
 }
 
@@ -1701,7 +1703,9 @@ void NavigationService::onRequestRejected(ValhallaClient::Reason reason,
             return;
         }
         if (cause == ValhallaClient::RejectionCause::Unhealthy) {
-            raiseError(QStringLiteral("Cannot reach routing server"));
+            raiseError(missingLocalRoutingTiles()
+                           ? QStringLiteral("Navigation requested but no routing tiles installed.")
+                           : QStringLiteral("Cannot reach routing server"));
             return;
         }
     }
@@ -1917,6 +1921,16 @@ void NavigationService::setStatus(NavigationStatus status)
         m_status = status;
         emit statusChanged();
     }
+}
+
+bool NavigationService::missingLocalRoutingTiles() const
+{
+    const QUrl endpoint(m_valhalla->endpoint());
+    const QString host = endpoint.host();
+    return m_routingTilesAvailable
+        && (host == QLatin1String("127.0.0.1") || host == QLatin1String("localhost")
+            || host == QLatin1String("::1"))
+        && !m_routingTilesAvailable();
 }
 
 void NavigationService::raiseError(const QString &message)

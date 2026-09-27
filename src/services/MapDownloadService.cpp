@@ -1195,6 +1195,11 @@ bool MapDownloadService::hasMapsInstalled() const
     return QFile::exists(displayDestPath());
 }
 
+bool MapDownloadService::hasRoutingTilesInstalled() const
+{
+    return QFile::exists(routingDestPath());
+}
+
 void MapDownloadService::adoptInstalledMaps()
 {
     bool changed = false;
