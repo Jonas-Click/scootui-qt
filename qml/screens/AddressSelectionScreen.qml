@@ -63,6 +63,14 @@ Rectangle {
     property double destLng: 0
     property bool loadingHouseNumbers: false
 
+    // While a route is active the confirm step offers to extend it instead of
+    // replacing it. 0 = add to route, 1 = add as intermediate stop,
+    // 2 = discard the route and navigate.
+    readonly property bool hasActivePlan: typeof navigationService !== "undefined"
+                                          && navigationService.hasPlan
+    readonly property bool confirmHasChoices: hasActivePlan
+    property int confirmActionIndex: 0
+
     // When database becomes ready, start city letter input
     onDbStatusChanged: {
         if (dbStatus === statusReady) {
@@ -187,7 +195,7 @@ Rectangle {
                     addressScreen.destLat = coords.latitude || 0
                     addressScreen.destLng = coords.longitude || 0
                 }
-                addressScreen.phase = addressScreen.phaseConfirm
+                addressScreen.enterConfirm()
                 return
             }
             if (houses.length <= addressScreen.houseListThreshold) {
@@ -202,6 +210,17 @@ Rectangle {
 
     function enterConfirm() {
         phase = phaseConfirm
+        // Entered from Route > Add stop, appending is the intent; from the
+        // plain address search, replacing is. The index is moot without a
+        // route, where the confirm step has a single action.
+        confirmActionIndex = confirmHasChoices
+            ? ((typeof screenStore !== "undefined" && screenStore.addressSelectionAppend) ? 0 : 2)
+            : 0
+    }
+
+    function cycleConfirmAction() {
+        if (!confirmHasChoices) return
+        confirmActionIndex = (confirmActionIndex + 1) % 3
     }
 
     // --- Char carousel logic ---
@@ -447,16 +466,26 @@ Rectangle {
     }
 
     function confirmAndNavigate() {
+        runConfirmAction(confirmHasChoices ? confirmActionIndex : 0)
+    }
+
+    // action: 0 = add to route, 1 = add as intermediate stop, 2 = replace.
+    function runConfirmAction(action) {
         var addressLabel = selectedStreet
         if (selectedHouse !== "")
             addressLabel += " " + selectedHouse
         addressLabel += ", " + selectedCity
 
         if (typeof navigationService !== "undefined") {
+            var planActive = navigationService.hasPlan
             // Opened from the route submenu to extend the active plan, or from
             // the normal entry point to replace it.
             var append = typeof screenStore !== "undefined" && screenStore.addressSelectionAppend
-            if (append)
+            if (planActive && action === 1)
+                navigationService.insertStop(destLat, destLng, addressLabel)
+            else if (planActive && action === 0)
+                navigationService.appendStop(destLat, destLng, addressLabel)
+            else if (!planActive && append)
                 navigationService.appendStop(destLat, destLng, addressLabel)
             else
                 navigationService.setDestination(destLat, destLng, addressLabel)
@@ -504,6 +533,8 @@ Rectangle {
                        addressScreen.phase === addressScreen.phaseStreetList ||
                        addressScreen.phase === addressScreen.phaseHouseNumbers) {
                 addressScreen.cycleListItem()
+            } else if (addressScreen.phase === addressScreen.phaseConfirm) {
+                addressScreen.cycleConfirmAction()
             }
         }
 
@@ -993,6 +1024,42 @@ Rectangle {
                     font.pixelSize: themeStore.fontTitle
                     color: textSecondary
                 }
+
+                // Route choice, only while a route is active. Left tap cycles
+                // the highlighted action, right tap runs it.
+                Column {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 10
+                    spacing: 4
+                    visible: addressScreen.confirmHasChoices
+
+                    Repeater {
+                        model: [
+                            typeof translations !== "undefined" ? translations.menuAddToRoute : "Add to route",
+                            typeof translations !== "undefined" ? translations.menuAddAsIntermediate : "Add as intermediate stop",
+                            typeof translations !== "undefined" ? translations.menuDiscardAndNavigate : "Discard route and navigate"
+                        ]
+
+                        delegate: Rectangle {
+                            required property int index
+                            required property string modelData
+                            width: confirmChoiceText.implicitWidth + 28
+                            height: 30
+                            radius: themeStore.radiusCard
+                            color: addressScreen.confirmActionIndex === index ? selectedBg : "transparent"
+                            border.width: 1
+                            border.color: addressScreen.confirmActionIndex === index ? textPrimary : borderColor
+
+                            Text {
+                                id: confirmChoiceText
+                                anchors.centerIn: parent
+                                text: modelData
+                                color: textPrimary
+                                font.pixelSize: themeStore.fontBody
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -1019,7 +1086,7 @@ Rectangle {
                 // the confirm step, where only the hold is bound.
                 leftTap: {
                     if (dbStatus !== statusReady || addressScreen.loadingHouseNumbers) return ""
-                    if (addressScreen.phase === addressScreen.phaseConfirm) return ""
+                    if (addressScreen.phase === addressScreen.phaseConfirm && !addressScreen.confirmHasChoices) return ""
                     var tr = typeof translations !== "undefined" ? translations : null
                     return tr ? tr.controlScroll : "Scroll"
                 }

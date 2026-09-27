@@ -798,6 +798,41 @@ void NavigationService::appendStop(double lat, double lng, const QString &label)
     });
 }
 
+void NavigationService::insertStop(double lat, double lng, const QString &label)
+{
+    const LatLng point{lat, lng};
+    if (!point.isValid()) {
+        raiseError(QStringLiteral("Invalid route plan stop"));
+        return;
+    }
+    if (!m_plan.isValid()) {
+        setDestination(lat, lng, label);
+        return;
+    }
+
+    // The stop guidance is on, or the one after it once that stop has been
+    // reached and only the continue prompt is pending.
+    const bool currentReached = m_planState == RoutePlanState::AtStop
+        || m_planState == RoutePlanState::Held
+        || (m_planState == RoutePlanState::Paused && m_pausedAfterReach);
+    const int index = qBound(0, m_plan.currentStep + (currentReached ? 1 : 0),
+                             m_plan.stopCount());
+
+    requestPlan(QStringLiteral("plan.append"),
+                {{QStringLiteral("stop"), QJsonObject{{QStringLiteral("lat"), lat},
+                    {QStringLiteral("lon"), lng}, {QStringLiteral("label"), label}}}},
+                [this, index, lat, lng, label]() {
+        emit destinationRequested(lat, lng, label);
+        const int from = m_plan.stopCount() - 1;
+        if (from <= index)
+            return;
+        requestPlan(QStringLiteral("plan.move"),
+                    {{QStringLiteral("from_index"), from},
+                     {QStringLiteral("to_index"), index},
+                     {QStringLiteral("expected_revision"), double(m_planRevision)}});
+    });
+}
+
 void NavigationService::removeStop(int index)
 {
     if (index < 0 || index >= m_plan.stopCount()) return;

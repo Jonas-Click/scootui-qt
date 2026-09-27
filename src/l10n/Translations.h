@@ -302,6 +302,9 @@ class Translations : public QObject
     Q_PROPERTY(QString menuEnterDestinationCode READ menuEnterDestinationCode NOTIFY languageChanged)
     Q_PROPERTY(QString menuDeleteLocation READ menuDeleteLocation NOTIFY languageChanged)
     Q_PROPERTY(QString menuStartNavigation READ menuStartNavigation NOTIFY languageChanged)
+    Q_PROPERTY(QString menuAddToRoute READ menuAddToRoute NOTIFY languageChanged)
+    Q_PROPERTY(QString menuAddAsIntermediate READ menuAddAsIntermediate NOTIFY languageChanged)
+    Q_PROPERTY(QString menuDiscardAndNavigate READ menuDiscardAndNavigate NOTIFY languageChanged)
     Q_PROPERTY(QString menuStopNavigation READ menuStopNavigation NOTIFY languageChanged)
     Q_PROPERTY(QString menuRoutePlan READ menuRoutePlan NOTIFY languageChanged)
     Q_PROPERTY(QString menuRoutePlanHeader READ menuRoutePlanHeader NOTIFY languageChanged)
@@ -1007,6 +1010,9 @@ public:
     QString menuEnterDestinationCode() const { return lookup("menuEnterDestinationCode"); }
     QString menuDeleteLocation() const { return lookup("menuDeleteLocation"); }
     QString menuStartNavigation() const { return lookup("menuStartNavigation"); }
+    QString menuAddToRoute() const { return lookup("menuAddToRoute"); }
+    QString menuAddAsIntermediate() const { return lookup("menuAddAsIntermediate"); }
+    QString menuDiscardAndNavigate() const { return lookup("menuDiscardAndNavigate"); }
     QString menuStopNavigation() const { return lookup("menuStopNavigation"); }
     QString menuRoutePlan() const { return lookup("menuRoutePlan"); }
     QString menuRoutePlanHeader() const { return lookup("menuRoutePlanHeader"); }

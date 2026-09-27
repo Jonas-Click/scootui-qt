@@ -28,6 +28,7 @@ private slots:
     void queuedArrivalCannotReachReplacement();
     void reachedStopAdvancesAndFinalArrivalRetainsOwner();
     void moveJumpAndRemovePreserveTarget();
+    void insertStopPlacesBeforeActiveStop();
     void rebootRestoresOwnerSnapshot();
     void rebootCompletedPlanDoesNotRearmArrival();
     void clearDoesNotRestoreLegacySettings();
@@ -260,6 +261,25 @@ void NavigationHopTest::moveJumpAndRemovePreserveTarget()
     f.nav.removeStop(1);
     QTRY_COMPARE_WITH_TIMEOUT(f.nav.stopCount(), 2, 3000);
     QCOMPARE(snapshot(f.repo).value(QStringLiteral("stops")).toArray().size(), 2);
+}
+
+void NavigationHopTest::insertStopPlacesBeforeActiveStop()
+{
+    Fixture f;
+    f.nav.setRoutePlan(QVariantList{
+        QVariantMap{{QStringLiteral("lat"), 52.51}, {QStringLiteral("lon"), 13.41}},
+        QVariantMap{{QStringLiteral("lat"), 52.52}, {QStringLiteral("lon"), 13.42}},
+        QVariantMap{{QStringLiteral("lat"), 52.53}, {QStringLiteral("lon"), 13.43}}}, 1);
+    QTRY_COMPARE_WITH_TIMEOUT(f.nav.currentStep(), 1, 3000);
+    f.nav.insertStop(52.55, 13.45, QStringLiteral("X"));
+    QTRY_COMPARE_WITH_TIMEOUT(f.nav.stopCount(), 4, 3000);
+    // The inserted stop becomes the next target; guidance still follows the
+    // stop the plan was already on, which shifted down one.
+    QTRY_COMPARE_WITH_TIMEOUT(f.nav.currentStep(), 2, 3000);
+    QCOMPARE(f.nav.destLatitude(), 52.52);
+    const QJsonArray stops = snapshot(f.repo).value(QStringLiteral("stops")).toArray();
+    QCOMPARE(stops.size(), 4);
+    QCOMPARE(stops.at(1).toObject().value(QStringLiteral("label")).toString(), QStringLiteral("X"));
 }
 
 void NavigationHopTest::rebootRestoresOwnerSnapshot()

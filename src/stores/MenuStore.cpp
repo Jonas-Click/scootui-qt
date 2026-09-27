@@ -362,59 +362,39 @@ void MenuStore::rebuildMenuTree()
         });
     m_rootNode->addChild(navNode);
 
-    // Enter destination code
-    navNode->addChild(MenuNode::action(QStringLiteral("nav_enter_code"),
-        tr->menuEnterDestinationCode(), [this]() {
-            closeForScreen();
-            if (m_screenStore) m_screenStore->showAddressSelection();
-        }));
+    // Destination rows go saved-first, then recent, then the route editor,
+    // then free-text entry: the list a rider curated comes before the one the
+    // scooter accumulated, and the multi-step address search comes last.
+    const bool planActive = m_navigationService && m_navigationService->hasPlan();
 
-    // Recent destinations submenu (nested under Navigation) — last 10
-    // destinations the rider has navigated to. Each gets a sub-submenu
-    // with Start Navigation / Save to favorites / Delete.
-    if (m_recentDestinations && m_recentDestinations->count() > 0) {
-        auto *recentNode = MenuNode::submenu(QStringLiteral("recent_destinations"),
-                                              tr->menuRecentDestinations());
-        navNode->addChild(recentNode);
-
-        auto dests = m_recentDestinations->destinations();
-        for (const auto &destVar : dests) {
-            auto dest = destVar.toMap();
-            int destId = dest[QStringLiteral("id")].toInt();
-            QString label = dest[QStringLiteral("label")].toString();
-            if (label.isEmpty())
-                label = QStringLiteral("%1, %2").arg(
-                    dest[QStringLiteral("latitude")].toDouble(), 0, 'f', 5).arg(
-                    dest[QStringLiteral("longitude")].toDouble(), 0, 'f', 5);
-
-            auto *destNode = MenuNode::submenu(
-                QStringLiteral("recent_dest_%1").arg(destId), label);
-            recentNode->addChild(destNode);
-            destNode->setPrimaryChildId(QStringLiteral("start_recent_%1").arg(destId));
-
-            destNode->addChild(MenuNode::action(
-                QStringLiteral("start_recent_%1").arg(destId),
-                tr->menuStartNavigation(),
-                [this, destId]() {
-                    m_recentDestinations->navigateToRecent(destId);
+    // One destination row's actions. While a route is active the row extends
+    // it (append, or insert before the active stop) and keeps the replace
+    // action behind an explicit "discard" label; otherwise it is a plain
+    // Start Navigation. Append is the right long-tap default, so the
+    // destructive replace is never one gesture away.
+    auto addDestinationActions = [&](MenuNode *node, const QString &idPrefix,
+                                     double lat, double lng, const QString &label,
+                                     std::function<void()> startNavigation) {
+        if (planActive) {
+            node->addChild(MenuNode::action(idPrefix + QStringLiteral("_append"),
+                tr->menuAddToRoute(), [this, lat, lng, label]() {
+                    if (m_navigationService) m_navigationService->appendStop(lat, lng, label);
                     close();
                 }));
-
-            destNode->addChild(MenuNode::action(
-                QStringLiteral("save_recent_%1").arg(destId),
-                tr->menuSaveToFavorites(),
-                [this, destId]() {
-                    m_recentDestinations->promoteToSaved(destId);
+            node->addChild(MenuNode::action(idPrefix + QStringLiteral("_insert"),
+                tr->menuAddAsIntermediate(), [this, lat, lng, label]() {
+                    if (m_navigationService) m_navigationService->insertStop(lat, lng, label);
+                    close();
                 }));
-
-            destNode->addChild(MenuNode::action(
-                QStringLiteral("delete_recent_%1").arg(destId),
-                tr->menuDeleteLocation(),
-                [this, destId]() {
-                    m_recentDestinations->deleteRecent(destId);
-                }));
+            node->addChild(MenuNode::action(idPrefix + QStringLiteral("_replace"),
+                tr->menuDiscardAndNavigate(), [startNavigation]() { startNavigation(); }));
+            node->setPrimaryChildId(idPrefix + QStringLiteral("_append"));
+        } else {
+            node->addChild(MenuNode::action(idPrefix + QStringLiteral("_start"),
+                tr->menuStartNavigation(), [startNavigation]() { startNavigation(); }));
+            node->setPrimaryChildId(idPrefix + QStringLiteral("_start"));
         }
-    }
+    };
 
     // Saved locations submenu (nested under Navigation)
     if (m_savedLocations) {
@@ -432,30 +412,71 @@ void MenuStore::rebuildMenuTree()
         for (const auto &locVar : locs) {
             auto loc = locVar.toMap();
             int locId = loc[QStringLiteral("id")].toInt();
+            double lat = loc[QStringLiteral("latitude")].toDouble();
+            double lng = loc[QStringLiteral("longitude")].toDouble();
             QString label = loc[QStringLiteral("label")].toString();
             if (label.isEmpty())
-                label = QStringLiteral("%1, %2").arg(
-                    loc[QStringLiteral("latitude")].toDouble(), 0, 'f', 5).arg(
-                    loc[QStringLiteral("longitude")].toDouble(), 0, 'f', 5);
+                label = QStringLiteral("%1, %2").arg(lat, 0, 'f', 5).arg(lng, 0, 'f', 5);
 
             auto *locNode = MenuNode::submenu(
                 QStringLiteral("saved_loc_%1").arg(locId), label);
             savedLocsNode->addChild(locNode);
-            locNode->setPrimaryChildId(QStringLiteral("start_nav_%1").arg(locId));
 
-            locNode->addChild(MenuNode::action(
-                QStringLiteral("start_nav_%1").arg(locId),
-                tr->menuStartNavigation(),
-                [this, locId]() {
+            addDestinationActions(locNode, QStringLiteral("start_nav_%1").arg(locId),
+                lat, lng, label, [this, locId]() {
                     m_savedLocations->navigateToLocation(locId);
                     close();
-                }));
+                });
 
             locNode->addChild(MenuNode::action(
                 QStringLiteral("delete_loc_%1").arg(locId),
                 tr->menuDeleteLocation(),
                 [this, locId]() {
                     m_savedLocations->deleteLocation(locId);
+                }));
+        }
+    }
+
+    // Recent destinations submenu (nested under Navigation) — last 10
+    // destinations the rider has navigated to. Each gets a sub-submenu
+    // whose actions extend or replace the active route.
+    if (m_recentDestinations && m_recentDestinations->count() > 0) {
+        auto *recentNode = MenuNode::submenu(QStringLiteral("recent_destinations"),
+                                              tr->menuRecentDestinations());
+        navNode->addChild(recentNode);
+
+        auto dests = m_recentDestinations->destinations();
+        for (const auto &destVar : dests) {
+            auto dest = destVar.toMap();
+            int destId = dest[QStringLiteral("id")].toInt();
+            double lat = dest[QStringLiteral("latitude")].toDouble();
+            double lng = dest[QStringLiteral("longitude")].toDouble();
+            QString label = dest[QStringLiteral("label")].toString();
+            if (label.isEmpty())
+                label = QStringLiteral("%1, %2").arg(lat, 0, 'f', 5).arg(lng, 0, 'f', 5);
+
+            auto *destNode = MenuNode::submenu(
+                QStringLiteral("recent_dest_%1").arg(destId), label);
+            recentNode->addChild(destNode);
+
+            addDestinationActions(destNode, QStringLiteral("start_recent_%1").arg(destId),
+                lat, lng, label, [this, destId]() {
+                    m_recentDestinations->navigateToRecent(destId);
+                    close();
+                });
+
+            destNode->addChild(MenuNode::action(
+                QStringLiteral("save_recent_%1").arg(destId),
+                tr->menuSaveToFavorites(),
+                [this, destId]() {
+                    m_recentDestinations->promoteToSaved(destId);
+                }));
+
+            destNode->addChild(MenuNode::action(
+                QStringLiteral("delete_recent_%1").arg(destId),
+                tr->menuDeleteLocation(),
+                [this, destId]() {
+                    m_recentDestinations->deleteRecent(destId);
                 }));
         }
     }
@@ -560,6 +581,14 @@ void MenuStore::rebuildMenuTree()
                     || state == static_cast<int>(RoutePlanState::Paused);
             }));
     }
+
+    // Enter destination code, below the route editor: free-text entry is the
+    // slowest way to pick a destination, so it comes after the lists.
+    navNode->addChild(MenuNode::action(QStringLiteral("nav_enter_code"),
+        tr->menuEnterDestinationCode(), [this]() {
+            closeForScreen();
+            if (m_screenStore) m_screenStore->showAddressSelection();
+        }));
 
     // Stop navigation, shown while there's a route to cancel. hasRoute()
     // rather than isNavigating() so the entry stays put through Rerouting

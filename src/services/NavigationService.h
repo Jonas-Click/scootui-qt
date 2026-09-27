@@ -205,6 +205,10 @@ public:
     Q_INVOKABLE void setRoutePlan(const QVariantList &stops, int startStep = 0);
     void setRoutePlan(const QList<RouteStop> &stops, int startStep = 0);
     Q_INVOKABLE void appendStop(double lat, double lng, const QString &label = {});
+    // Insert a stop before the currently active one, so it becomes the next
+    // stop to reach. The plan protocol has no insert of its own, so this is
+    // append followed by plan.move.
+    Q_INVOKABLE void insertStop(double lat, double lng, const QString &label = {});
     Q_INVOKABLE void removeStop(int index);
     Q_INVOKABLE void moveStop(int from, int to);
     // Advance to the next hop now, from any guided or held state. On the last

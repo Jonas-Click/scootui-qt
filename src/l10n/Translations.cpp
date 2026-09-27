@@ -811,6 +811,13 @@ void Translations::initStrings()
     en[QStringLiteral("menuStartNavigation")] = QStringLiteral("Start Navigation");
     de[QStringLiteral("menuStartNavigation")] = QStringLiteral("Navigation starten");
 
+    en[QStringLiteral("menuAddToRoute")] = QStringLiteral("Add to route");
+    de[QStringLiteral("menuAddToRoute")] = QStringLiteral("Zur Route hinzufügen");
+    en[QStringLiteral("menuAddAsIntermediate")] = QStringLiteral("Add as intermediate stop");
+    de[QStringLiteral("menuAddAsIntermediate")] = QStringLiteral("Als Zwischenziel hinzufügen");
+    en[QStringLiteral("menuDiscardAndNavigate")] = QStringLiteral("Discard route and navigate");
+    de[QStringLiteral("menuDiscardAndNavigate")] = QStringLiteral("Route verwerfen und navigieren");
+
     en[QStringLiteral("menuStopNavigation")] = QStringLiteral("Stop Navigation");
     de[QStringLiteral("menuStopNavigation")] = QStringLiteral("Navigation beenden");
     en[QStringLiteral("menuRoutePlan")] = QStringLiteral("Route");
