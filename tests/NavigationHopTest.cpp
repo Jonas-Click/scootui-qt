@@ -39,7 +39,10 @@ private slots:
     void unavailableOwnerRestoreStaysSilent();
     void keepStopIsDurableAndClearedOnDismount();
     void intermediatePlanResumesAfterHopOn();
-    void planCreatedInHopOnStartsWhenReady();
+    void planCreatedInHopOnStartsWhenParked();
+    void pausedPlanResumesOnUnlockToParked();
+    void restoredPlanStartsWhileParked();
+    void reachedStopWaitsUntilReadyToDrive();
     void singleDestinationRouteSurvivesHopOn();
     void missingRoutingTilesReportsSpecificError();
     void recoveryWaitsForFirstHealthyProbe();
@@ -195,17 +198,20 @@ void NavigationHopTest::intermediatePlanResumesAfterHopOn()
     f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("hop-on"));
     QTRY_VERIFY_WITH_TIMEOUT(f.vehicle.hopOnActive(), 3000);
     QCOMPARE(f.nav.planState(), int(RoutePlanState::Paused));
+    QSignalSpy routeChanges(&f.nav, &NavigationService::routeChanged);
     f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("parked"));
-    QTRY_VERIFY_WITH_TIMEOUT(f.vehicle.isParked(), 3000);
-    QCOMPARE(f.nav.planState(), int(RoutePlanState::Paused));
-    f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("ready-to-drive"));
     QTRY_COMPARE_WITH_TIMEOUT(f.nav.planState(), int(RoutePlanState::Navigating), 3000);
     QCOMPARE(f.nav.status(), int(NavigationStatus::Calculating));
     QVERIFY(!f.nav.hasRoute());
+    QCOMPARE(routeChanges.size(), 1);
+    f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("ready-to-drive"));
+    QTRY_VERIFY_WITH_TIMEOUT(f.vehicle.isReadyToDrive(), 3000);
+    QCOMPARE(f.nav.planState(), int(RoutePlanState::Navigating));
+    QCOMPARE(routeChanges.size(), 1);
     QCOMPARE(f.nav.currentStep(), 0);
 }
 
-void NavigationHopTest::planCreatedInHopOnStartsWhenReady()
+void NavigationHopTest::planCreatedInHopOnStartsWhenParked()
 {
     Fixture f;
     f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("parked"));
@@ -215,12 +221,63 @@ void NavigationHopTest::planCreatedInHopOnStartsWhenReady()
     f.nav.appendStop(52.51, 13.41);
     QTRY_COMPARE_WITH_TIMEOUT(f.nav.planState(), int(RoutePlanState::Paused), 3000);
     f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("parked"));
-    QTRY_VERIFY_WITH_TIMEOUT(f.vehicle.isParked(), 3000);
-    QCOMPARE(f.nav.planState(), int(RoutePlanState::Paused));
-    f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("ready-to-drive"));
     QTRY_COMPARE_WITH_TIMEOUT(f.nav.planState(), int(RoutePlanState::Navigating), 3000);
     QCOMPARE(f.nav.status(), int(NavigationStatus::Calculating));
     QCOMPARE(f.nav.stopCount(), 1);
+}
+
+void NavigationHopTest::pausedPlanResumesOnUnlockToParked()
+{
+    Fixture f;
+    f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("stand-by"));
+    QTRY_VERIFY_WITH_TIMEOUT(f.vehicle.isStandBy(), 3000);
+    gps(f, 52.50, 13.40);
+    f.nav.appendStop(52.51, 13.41);
+    QTRY_COMPARE_WITH_TIMEOUT(f.nav.planState(), int(RoutePlanState::Paused), 3000);
+    f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("parked"));
+    QTRY_COMPARE_WITH_TIMEOUT(f.nav.planState(), int(RoutePlanState::Navigating), 3000);
+    QCOMPARE(f.nav.status(), int(NavigationStatus::Calculating));
+}
+
+void NavigationHopTest::restoredPlanStartsWhileParked()
+{
+    InMemoryMdbRepository repo;
+    external(repo, QStringLiteral("plan.append"),
+             {{QStringLiteral("stop"), stop(52.51, 13.41, QStringLiteral("A"))}});
+    repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("parked"));
+    GpsStore gpsStore(&repo); SpeedLimitStore speed(&repo); NavigationStore store(&repo);
+    VehicleStore vehicle(&repo); SettingsStore settings(&repo);
+    NavigationService nav(&gpsStore, &store, &vehicle, &settings, &speed, &repo);
+    gpsStore.start(); store.start(); vehicle.start(); settings.start(); speed.start();
+    QTRY_COMPARE_WITH_TIMEOUT(nav.planState(), int(RoutePlanState::Navigating), 3000);
+    QCOMPARE(nav.status(), int(NavigationStatus::WaitingForPosition));
+    if (auto *client = nav.findChild<ValhallaClient *>()) client->cancelPending();
+}
+
+void NavigationHopTest::reachedStopWaitsUntilReadyToDrive()
+{
+    Fixture f;
+    gps(f, 52.50, 13.40);
+    f.nav.setRoutePlan(QVariantList{
+        QVariantMap{{QStringLiteral("lat"), 52.51}, {QStringLiteral("lon"), 13.41}},
+        QVariantMap{{QStringLiteral("lat"), 52.52}, {QStringLiteral("lon"), 13.42}}});
+    QTRY_COMPARE_WITH_TIMEOUT(f.nav.planState(), int(RoutePlanState::Navigating), 3000);
+    const QJsonObject plan = snapshot(f.repo);
+    external(f.repo, QStringLiteral("plan.reached"),
+             {{QStringLiteral("expected_plan_id"), plan.value(QStringLiteral("id"))},
+              {QStringLiteral("expected_stop_id"), plan.value(QStringLiteral("stops"))
+                   .toArray().first().toObject().value(QStringLiteral("id"))}});
+    QTRY_COMPARE_WITH_TIMEOUT(f.nav.planState(), int(RoutePlanState::AtStop), 3000);
+    f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("parked"));
+    QTRY_COMPARE_WITH_TIMEOUT(f.nav.planState(), int(RoutePlanState::Paused), 3000);
+    f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("hop-on"));
+    QTRY_VERIFY_WITH_TIMEOUT(f.vehicle.hopOnActive(), 3000);
+    f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("parked"));
+    QTRY_COMPARE_WITH_TIMEOUT(f.vehicle.state(), int(ScootEnums::VehicleState::Parked), 3000);
+    QCOMPARE(f.nav.planState(), int(RoutePlanState::Paused));
+    QCOMPARE(f.nav.currentStep(), 0);
+    f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("ready-to-drive"));
+    QTRY_COMPARE_WITH_TIMEOUT(f.nav.currentStep(), 1, 3000);
 }
 
 void NavigationHopTest::singleDestinationRouteSurvivesHopOn()
@@ -243,7 +300,7 @@ void NavigationHopTest::singleDestinationRouteSurvivesHopOn()
     f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("hop-on"));
     QTRY_VERIFY_WITH_TIMEOUT(f.vehicle.hopOnActive(), 3000);
     f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("parked"));
-    QTRY_VERIFY_WITH_TIMEOUT(f.vehicle.isParked(), 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(f.vehicle.state(), int(ScootEnums::VehicleState::Parked), 3000);
     f.repo.set(QStringLiteral("vehicle"), QStringLiteral("state"), QStringLiteral("ready-to-drive"));
     QTRY_VERIFY_WITH_TIMEOUT(f.vehicle.isReadyToDrive(), 3000);
     QVERIFY(f.nav.hasRoute());

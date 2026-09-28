@@ -1101,7 +1101,8 @@ void NavigationService::applyPlanSnapshot(const QJsonObject &snapshot)
                     && m_vehicle->state() == static_cast<int>(ScootEnums::VehicleState::Unknown);
                 setPlanState(RoutePlanState::Paused);
             }
-        } else if (m_vehicle && m_vehicle->isReadyToDrive()) {
+        } else if (m_vehicle && (m_vehicle->isReadyToDrive()
+                                 || m_vehicle->state() == static_cast<int>(ScootEnums::VehicleState::Parked))) {
             beginCurrentHop(ValhallaClient::Reason::Destination);
         } else {
             m_valhalla->cancelPending();
@@ -1580,6 +1581,11 @@ void NavigationService::onVehicleStateChanged()
         } else if (m_planState == RoutePlanState::Paused) {
             resumePlan();
         }
+        return;
+    }
+    if (m_vehicle->state() == static_cast<int>(ScootEnums::VehicleState::Parked)
+        && m_planState == RoutePlanState::Paused && !m_pausedAfterReach) {
+        resumePlan();
         return;
     }
 

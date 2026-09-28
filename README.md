@@ -57,6 +57,14 @@ plan fields or persist a second copy. The snapshot also includes `keep_current_s
 choice to suppress proximity arrival until dismount. A reached final stop
 remains completed across reboots until cleared or extended with another stop.
 
+An unreached hop can calculate its route in `parked`, including after unlock,
+after leaving hop-on, or when restored while already parked. An
+intermediate hop pauses on dismount or entry into hop-on and requests a fresh
+route when the scooter returns to `parked`. A reached intermediate stop waits
+until `ready-to-drive` before advancing. Routing waits for a usable position
+and a healthy Valhalla endpoint; a single-destination route already calculated
+away from its destination remains available through hop-on.
+
 ## Configuration
 
 ### Environment
