@@ -27,11 +27,12 @@ ValhallaClient::ValhallaClient(QObject *parent)
     connect(&m_userRequestDeadline, &QTimer::timeout, this, [this]() {
         // Race: probe may have succeeded and dispatched between timer fire
         // and handler run. Only surface the error if we're still queued.
-        if (!m_hasPending || m_hasBeenHealthy || !isUserReason(m_pendingReason))
+        if (!m_hasPending || m_hasBeenHealthy
+            || (!isUserReason(m_pendingReason) && m_pendingReason != Reason::Recovery))
             return;
         Reason reason = m_pendingReason;
         m_hasPending = false;
-        qDebug() << "ValhallaClient: user request timed out waiting for healthy probe";
+        qDebug() << "ValhallaClient: route request timed out waiting for healthy probe";
         emit requestRejected(reason, RejectionCause::Unhealthy);
     });
 
@@ -321,6 +322,10 @@ ValhallaClient::DispatchResult ValhallaClient::canDispatch(Reason reason, Reject
         return DispatchResult::OK;
     }
 
+    // A restored trip must wait for the first health probe just like a new trip.
+    if (reason == Reason::Recovery && !m_hasBeenHealthy)
+        return DispatchResult::NotYetHealthy;
+
     // Auto reason
     if (!m_isHealthy) {
         cause = RejectionCause::Unhealthy;
@@ -372,7 +377,7 @@ void ValhallaClient::dispatchPending()
         // Keep pending; when the health probe flips to healthy it will
         // call dispatchPending() again. Arm the deadline so we don't
         // hang forever if the server is genuinely down.
-        qDebug() << "ValhallaClient: deferring user request until first healthy probe";
+        qDebug() << "ValhallaClient: deferring route request until first healthy probe";
         if (!m_userRequestDeadline.isActive())
             m_userRequestDeadline.start();
         break;

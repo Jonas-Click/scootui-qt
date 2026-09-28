@@ -2,6 +2,8 @@
 #include <QDateTime>
 #include <QJsonDocument>
 #include <QSignalSpy>
+#include <QTcpServer>
+#include <QTcpSocket>
 
 #include "routing/ValhallaClient.h"
 #include "services/AddressDatabaseService.h"
@@ -37,6 +39,9 @@ private slots:
     void unavailableOwnerRestoreStaysSilent();
     void keepStopIsDurableAndClearedOnDismount();
     void missingRoutingTilesReportsSpecificError();
+    void recoveryWaitsForFirstHealthyProbe();
+    void recoveryTimesOutWithoutHealthyProbe();
+    void rejectedRecoveryLeavesCalculatingState();
 
 private:
     struct Fixture {
@@ -81,6 +86,87 @@ private:
             .arg(QDateTime::currentDateTimeUtc().toString(Qt::ISODate)));
     }
 };
+
+void NavigationHopTest::recoveryWaitsForFirstHealthyProbe()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+    QTcpSocket *healthRequest = nullptr;
+    int routeRequests = 0;
+    connect(&server, &QTcpServer::newConnection, &server, [&]() {
+        while (server.hasPendingConnections()) {
+            auto *socket = server.nextPendingConnection();
+            connect(socket, &QTcpSocket::readyRead, &server, [&, socket]() {
+                const QByteArray request = socket->readAll();
+                if (request.startsWith("GET /status"))
+                    healthRequest = socket;
+                else if (request.startsWith("POST /route"))
+                    ++routeRequests;
+            });
+        }
+    });
+
+    ValhallaClient client;
+    client.setEndpoint(QStringLiteral("http://127.0.0.1:%1/").arg(server.serverPort()));
+    QSignalSpy rejected(&client, &ValhallaClient::requestRejected);
+    QSignalSpy dispatched(&client, &ValhallaClient::requestDispatched);
+    client.requestRoute(LatLng{52.5, 13.4}, LatLng{52.6, 13.5},
+                        ValhallaClient::Reason::Recovery);
+    QTRY_VERIFY_WITH_TIMEOUT(healthRequest != nullptr, 3000);
+    QTest::qWait(ValhallaClient::DebounceIntervalMs + 100);
+    QCOMPARE(rejected.size(), 0);
+    QCOMPARE(dispatched.size(), 0);
+    QCOMPARE(routeRequests, 0);
+
+    healthRequest->write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}");
+    healthRequest->flush();
+    QTRY_COMPARE_WITH_TIMEOUT(dispatched.size(), 1, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(routeRequests, 1, 3000);
+    QCOMPARE(rejected.size(), 0);
+    client.cancelPending();
+}
+
+void NavigationHopTest::recoveryTimesOutWithoutHealthyProbe()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+    ValhallaClient client;
+    client.setEndpoint(QStringLiteral("http://127.0.0.1:%1/").arg(server.serverPort()));
+    QSignalSpy rejected(&client, &ValhallaClient::requestRejected);
+    QSignalSpy dispatched(&client, &ValhallaClient::requestDispatched);
+    client.requestRoute(LatLng{52.5, 13.4}, LatLng{52.6, 13.5},
+                        ValhallaClient::Reason::Recovery);
+    QTRY_COMPARE_WITH_TIMEOUT(rejected.size(), 1,
+                              ValhallaClient::UserRequestTimeoutMs + 3000);
+    QCOMPARE(rejected.first().at(0).value<ValhallaClient::Reason>(),
+             ValhallaClient::Reason::Recovery);
+    QCOMPARE(rejected.first().at(1).value<ValhallaClient::RejectionCause>(),
+             ValhallaClient::RejectionCause::Unhealthy);
+    QCOMPARE(dispatched.size(), 0);
+}
+
+void NavigationHopTest::rejectedRecoveryLeavesCalculatingState()
+{
+    Fixture f;
+    auto *client = f.nav.findChild<ValhallaClient *>();
+    QVERIFY(client);
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+    client->setEndpoint(QStringLiteral("http://127.0.0.1:%1/").arg(server.serverPort()));
+    gps(f, 52.5, 13.4);
+    f.nav.setRoutePlan(QVariantList{QVariantMap{{QStringLiteral("lat"), 52.6},
+        {QStringLiteral("lon"), 13.5}}});
+    QTRY_COMPARE_WITH_TIMEOUT(f.nav.status(), static_cast<int>(NavigationStatus::Calculating), 3000);
+    client->requestRejected(ValhallaClient::Reason::Recovery,
+                            ValhallaClient::RejectionCause::Unhealthy);
+    QCOMPARE(f.nav.status(), static_cast<int>(NavigationStatus::Error));
+    QCOMPARE(f.nav.errorMessage(), QStringLiteral("Cannot reach routing server"));
+    client->cancelPending();
+    QSignalSpy samples(&f.gps, &GpsStore::sampleChanged);
+    gps(f, 52.5001, 13.4);
+    QTRY_VERIFY_WITH_TIMEOUT(!samples.isEmpty(), 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(f.nav.status(), static_cast<int>(NavigationStatus::Calculating), 3000);
+}
 
 void NavigationHopTest::missingRoutingTilesReportsSpecificError()
 {

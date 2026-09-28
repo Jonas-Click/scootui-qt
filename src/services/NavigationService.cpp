@@ -1553,8 +1553,8 @@ void NavigationService::onGpsChanged()
                     onHopReached();
                 else
                     clearNavigation();
-            } else {
-                requestRoute(ValhallaClient::Reason::Recovery);
+            } else if (requestRoute(ValhallaClient::Reason::Recovery)) {
+                setStatus(NavigationStatus::Calculating);
             }
         } else {
             deferRouteForPosition(ValhallaClient::Reason::Recovery);
@@ -1732,7 +1732,7 @@ void NavigationService::onRequestRejected(ValhallaClient::Reason reason,
         reason == ValhallaClient::Reason::Destination ||
         reason == ValhallaClient::Reason::LanguageChange;
 
-    if (userReason) {
+    if (userReason || (reason == ValhallaClient::Reason::Recovery && !m_route.isValid())) {
         if (cause == ValhallaClient::RejectionCause::RateLimited) {
             raiseError(QStringLiteral("Too many routing requests"));
             return;
@@ -1741,6 +1741,10 @@ void NavigationService::onRequestRejected(ValhallaClient::Reason reason,
             raiseError(missingLocalRoutingTiles()
                            ? QStringLiteral("Navigation requested but no routing tiles installed.")
                            : QStringLiteral("Cannot reach routing server"));
+            return;
+        }
+        if (!userReason) {
+            raiseError(QStringLiteral("Route calculation unavailable"));
             return;
         }
     }
