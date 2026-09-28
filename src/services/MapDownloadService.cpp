@@ -2,6 +2,7 @@
 
 #include "repositories/MdbRepository.h"
 #include "services/MapRegionResolver.h"
+#include "services/RegionalMapCatalog.h"
 #include "utils/ZstdDecompressor.h"
 
 #include <QJsonDocument>
@@ -247,7 +248,8 @@ void MapDownloadService::resolveRegion(double lat, double lng)
 
 void MapDownloadService::startDownload(double lat, double lng, bool needsDisplay, bool needsRouting)
 {
-    if (!QDir(mapsDir()).entryList({QStringLiteral("tiles_*.mbtiles")}, QDir::Files).isEmpty()) {
+    if (RegionalMapCatalog::enabled() &&
+        !QDir(mapsDir()).entryList({QStringLiteral("tiles_*.mbtiles")}, QDir::Files).isEmpty()) {
         setError(QStringLiteral("Regional packs must be updated via USB"));
         return;
     }
@@ -330,7 +332,8 @@ void MapDownloadService::checkForUpdatesNow()
 
 void MapDownloadService::checkForUpdates()
 {
-    if (!QDir(mapsDir()).entryList({QStringLiteral("tiles_*.mbtiles")}, QDir::Files).isEmpty()) {
+    if (RegionalMapCatalog::enabled() &&
+        !QDir(mapsDir()).entryList({QStringLiteral("tiles_*.mbtiles")}, QDir::Files).isEmpty()) {
         emit updateCheckCompleted(false);
         return;
     }
@@ -429,7 +432,8 @@ void MapDownloadService::checkForUpdates()
 
 bool MapDownloadService::shouldCheckForUpdates() const
 {
-    if (!QDir(mapsDir()).entryList({QStringLiteral("tiles_*.mbtiles")}, QDir::Files).isEmpty())
+    if (RegionalMapCatalog::enabled() &&
+        !QDir(mapsDir()).entryList({QStringLiteral("tiles_*.mbtiles")}, QDir::Files).isEmpty())
         return false;
     if (!hasMapsInstalled())
         return false;

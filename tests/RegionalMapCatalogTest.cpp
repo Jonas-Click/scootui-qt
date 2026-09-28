@@ -11,6 +11,7 @@ class RegionalMapCatalogTest : public QObject
     Q_OBJECT
 private slots:
     void scanAndSelect();
+    void legacySingletonNeedsExplicitActivation();
 };
 
 void RegionalMapCatalogTest::scanAndSelect()
@@ -47,6 +48,32 @@ void RegionalMapCatalogTest::scanAndSelect()
     QCOMPARE(RegionalMapCatalog::select(packs, 5, 9.5, west->slug)->slug, west->slug);
     QCOMPARE(RegionalMapCatalog::select(packs, 5, 15, west->slug)->slug, QStringLiteral("east"));
     QVERIFY(!RegionalMapCatalog::select(packs, 50, 50));
+}
+
+void RegionalMapCatalogTest::legacySingletonNeedsExplicitActivation()
+{
+    QTemporaryDir maps, routing;
+    QVERIFY(maps.isValid());
+    QVERIFY(routing.isValid());
+    const QString mapPath = maps.filePath(QStringLiteral("map.mbtiles"));
+    const QString activePath = routing.filePath(QStringLiteral("tiles.tar"));
+    QFile map(mapPath), active(activePath);
+    QVERIFY(map.open(QIODevice::WriteOnly));
+    map.close();
+    QVERIFY(active.open(QIODevice::WriteOnly));
+    active.close();
+    QVERIFY(!RegionalMapCatalog::enabled(maps.path(), routing.path()));
+
+    const QString namedPath = routing.filePath(QStringLiteral("valhalla_tiles_test.tar"));
+    QFile named(namedPath);
+    QVERIFY(named.open(QIODevice::WriteOnly));
+    named.close();
+    QVERIFY(QFile::remove(activePath));
+    QVERIFY(QFile::link(namedPath, activePath));
+    QVERIFY(RegionalMapCatalog::enabled(maps.path(), routing.path()));
+    QVERIFY(QFile::remove(activePath));
+    QVERIFY(QFile::remove(mapPath));
+    QVERIFY(RegionalMapCatalog::enabled(maps.path(), routing.path()));
 }
 
 QTEST_MAIN(RegionalMapCatalogTest)

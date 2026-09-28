@@ -214,24 +214,30 @@ build).
 
 ## Regional offline packs
 
-Multiple installed regions can switch automatically on a recent GPS fix. Put
-`tiles_<slug>.mbtiles` in `/data/maps/` and the corresponding uncompressed
-`valhalla_tiles_<slug>.tar` in `/data/valhalla/`. USB update mode accepts several
-paired region files in its `maps/` directory. The installer creates
-`/data/valhalla/tiles.tar` as a symlink on a new installation; the dashboard
-switches that symlink atomically and restarts Valhalla when the active region
-changes. A regular legacy `tiles.tar` is never overwritten to enable switching:
-move it aside and create a symlink to one installed regional archive before
-using multiple regions. Legacy `map.mbtiles` remains a fallback.
+Existing `map.mbtiles` installations keep using the singleton map, routing
+archive, and built-in updater until regional mode is explicitly activated.
+To enable switching, put `tiles_<slug>.mbtiles` in `/data/maps/` and the matching
+uncompressed `valhalla_tiles_<slug>.tar` in `/data/valhalla/`. Make
+`/data/valhalla/tiles.tar` a symlink to one of those archives. On an existing
+installation, first preserve the singleton archive as a correctly named regional
+archive (a hard link avoids duplicating it), then replace the regular `tiles.tar`
+with the symlink. The USB installer never replaces a regular legacy archive.
+Without a singleton `map.mbtiles`, named packs can display immediately.
+
+USB update mode accepts multiple named region pairs in one operation. A
+single named pair on a legacy USB stick still installs as the singleton; add
+`maps/regional-packs` as an empty file to explicitly install one pair as a
+regional pack. With two or more named map files, or on an already activated
+regional installation, the named files are installed regionally. The installer
+creates the active symlink when no `tiles.tar` exists.
 
 Selection uses each MBTiles file's rectangular `bounds` metadata and retains the
 current region while its bounds contain the vehicle. Where bounding boxes
 heavily overlap, switching may lag the actual regional boundary. Routes must
 start and end within the active routing graph; cross-region routes are not
-supported. If the selected display pack lacks a matching routing archive, or
-multiple packs coexist with a regular legacy `tiles.tar`, local Valhalla is
-stopped rather than serving a mismatched graph. The dashboard's built-in map
-updater is for singleton packs; use USB update mode for regional packs.
+supported. If the selected display pack lacks a matching routing archive,
+local Valhalla is stopped rather than serving a mismatched graph. The built-in
+map updater is for singleton packs; use USB update mode for regional packs.
 
 ## Build and test
 

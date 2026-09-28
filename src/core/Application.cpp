@@ -523,6 +523,20 @@ void Application::createStores(QQmlApplicationEngine &engine)
     auto selectedRouting = std::make_shared<QString>(QStringLiteral("(uninitialized)"));
     const auto refreshPacks = [packs]() { *packs = RegionalMapCatalog::scan(); };
     const auto selectPack = [this, gpsStore, packs, selected, selectedMapRevision, selectedRouting]() {
+        if (!RegionalMapCatalog::enabled()) {
+            if (!selected->isEmpty()) {
+                selected->clear();
+                selectedMapRevision->clear();
+                *selectedRouting = QStringLiteral("(uninitialized)");
+                m_mapService->setRegionalMbtilesPath({});
+                m_roadInfoService->setRegionalMbtilesPath({});
+                if (m_addressDatabaseStarted)
+                    m_addressDatabaseService->setRegionalMbtilesPath({});
+                else
+                    m_pendingRegionalMapPath.clear();
+            }
+            return;
+        }
         if (!gpsStore->hasRecentFix())
             return;
         const auto *pack = RegionalMapCatalog::select(*packs, gpsStore->latitude(),

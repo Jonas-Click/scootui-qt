@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QSqlDatabase>
 #include <QSqlQuery>
@@ -27,6 +28,13 @@ public:
         }
         double area() const { return (east - west) * (north - south); }
     };
+
+    static bool enabled(const QString &mapsDir = QStringLiteral("/data/maps"),
+                        const QString &routingDir = QStringLiteral("/data/valhalla"))
+    {
+        return !QFile::exists(QDir(mapsDir).filePath(QStringLiteral("map.mbtiles")))
+            || QFileInfo(QDir(routingDir).filePath(QStringLiteral("tiles.tar"))).isSymLink();
+    }
 
     static QVector<Pack> scan(const QString &mapsDir = QStringLiteral("/data/maps"),
                               const QString &routingDir = QStringLiteral("/data/valhalla"))
