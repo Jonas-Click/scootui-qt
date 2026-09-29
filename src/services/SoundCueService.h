@@ -70,7 +70,7 @@ class SoundCueService : public QObject
     Q_OBJECT
 
 public:
-    static constexpr qreal DefaultVolume = 0.80;
+    static constexpr qreal DefaultVolume = 1.0;
 
     explicit SoundCueService(VehicleStore *vehicleStore, BatteryStore *battery0Store,
                              BatteryStore *battery1Store, ToastService *toastService,

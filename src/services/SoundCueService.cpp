@@ -323,7 +323,8 @@ bool SoundCueService::validateWaveFile(const QString &path, QString *error)
         return fail(QStringLiteral("truncated RIFF data"));
 
     bool validFormat = false;
-    bool hasAudio = false;
+    quint16 blockAlign = 0;
+    quint32 audioDataSize = 0;
     quint64 offset = 12;
     while (offset + 8 <= riffEnd) {
         const auto chunkOffset = static_cast<qsizetype>(offset);
@@ -337,14 +338,16 @@ bool SoundCueService::validateWaveFile(const QString &path, QString *error)
             if (size < 16)
                 return fail(QStringLiteral("invalid format chunk"));
             const auto formatOffset = static_cast<qsizetype>(payload);
+            const quint16 channels = readLe16(data, formatOffset + 2);
+            blockAlign = readLe16(data, formatOffset + 12);
             validFormat = readLe16(data, formatOffset) == 1
-                && readLe16(data, formatOffset + 2) == 2
+                && (channels == 1 || channels == 2)
                 && readLe32(data, formatOffset + 4) == 48000
-                && readLe32(data, formatOffset + 8) == 192000
-                && readLe16(data, formatOffset + 12) == 4
+                && readLe32(data, formatOffset + 8) == 48000 * channels * 2
+                && blockAlign == channels * 2
                 && readLe16(data, formatOffset + 14) == 16;
         } else if (id == "data") {
-            hasAudio = size > 0 && size % 4 == 0;
+            audioDataSize = size;
         }
         offset = paddedEnd;
     }
@@ -352,8 +355,8 @@ bool SoundCueService::validateWaveFile(const QString &path, QString *error)
     if (offset != riffEnd)
         return fail(QStringLiteral("truncated chunk header"));
     if (!validFormat)
-        return fail(QStringLiteral("expected 48 kHz stereo 16-bit PCM"));
-    if (!hasAudio)
+        return fail(QStringLiteral("expected 48 kHz mono/stereo 16-bit PCM"));
+    if (audioDataSize == 0 || audioDataSize % blockAlign != 0)
         return fail(QStringLiteral("missing PCM audio data"));
     return true;
 }

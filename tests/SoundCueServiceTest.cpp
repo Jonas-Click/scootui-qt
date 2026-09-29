@@ -206,13 +206,6 @@ private slots:
         for (const QString &name : names) {
             const QString path = QStringLiteral(SOUND_ASSET_DIR) + QLatin1Char('/') + name;
             QVERIFY2(SoundCueService::validateWaveFile(path), qPrintable(path));
-
-            QFile file(path);
-            QVERIFY(file.open(QIODevice::ReadOnly));
-            const QByteArray data = file.readAll();
-            for (qsizetype offset = 44; offset + 3 < data.size(); offset += 4) {
-                QCOMPARE(data.sliced(offset, 2), data.sliced(offset + 2, 2));
-            }
         }
     }
 
@@ -234,12 +227,14 @@ private slots:
         QVERIFY(!SoundCueService::validateWaveFile(
             writeFile(dir, QStringLiteral("invalid.wav"), QByteArray("not wave")), &error));
         QCOMPARE(error, QStringLiteral("not a RIFF/WAVE file"));
-        QVERIFY(!SoundCueService::validateWaveFile(
+        QVERIFY(SoundCueService::validateWaveFile(
             writeFile(dir, QStringLiteral("mono.wav"), waveData(1)), &error));
-        QCOMPARE(error, QStringLiteral("expected 48 kHz stereo 16-bit PCM"));
+        QVERIFY(!SoundCueService::validateWaveFile(
+            writeFile(dir, QStringLiteral("surround.wav"), waveData(3)), &error));
+        QCOMPARE(error, QStringLiteral("expected 48 kHz mono/stereo 16-bit PCM"));
         QVERIFY(!SoundCueService::validateWaveFile(
             writeFile(dir, QStringLiteral("low-rate.wav"), waveData(2, 44100)), &error));
-        QCOMPARE(error, QStringLiteral("expected 48 kHz stereo 16-bit PCM"));
+        QCOMPARE(error, QStringLiteral("expected 48 kHz mono/stereo 16-bit PCM"));
 
         QByteArray oversized = waveData();
         oversized.replace(4, 4, QByteArray(4, static_cast<char>(0xff)));
