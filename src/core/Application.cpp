@@ -27,6 +27,7 @@
 #include "stores/UmsLogStore.h"
 #include "stores/SpeedLimitStore.h"
 #include "stores/AutoStandbyStore.h"
+#include "stores/AutoLockStore.h"
 #include "stores/ScooterStore.h"
 #include "stores/CbBatteryStore.h"
 #include "stores/AuxBatteryStore.h"
@@ -292,6 +293,7 @@ void Application::createStores(QQmlApplicationEngine &engine)
     auto *umsLogStore = new UmsLogStore(repo, this);
     auto *speedLimitStore = new SpeedLimitStore(repo, this);
     auto *autoStandbyStore = new AutoStandbyStore(repo, this);
+    auto *autoLockStore = new AutoLockStore(repo, this);
     auto *scooterStore = new ScooterStore(repo, this);
     auto *cbBatteryStore = new CbBatteryStore(repo, this);
     auto *auxBatteryStore = new AuxBatteryStore(repo, this);
@@ -1001,6 +1003,7 @@ void Application::createStores(QQmlApplicationEngine &engine)
     ctx->setContextProperty(QStringLiteral("usbStore"), usbStore);
     ctx->setContextProperty(QStringLiteral("speedLimitStore"), speedLimitStore);
     ctx->setContextProperty(QStringLiteral("autoStandbyStore"), autoStandbyStore);
+    ctx->setContextProperty(QStringLiteral("autoLockStore"), autoLockStore);
     ctx->setContextProperty(QStringLiteral("scooterStore"), scooterStore);
     ctx->setContextProperty(QStringLiteral("cbBatteryStore"), cbBatteryStore);
     ctx->setContextProperty(QStringLiteral("auxBatteryStore"), auxBatteryStore);
@@ -1062,7 +1065,7 @@ void Application::createStores(QQmlApplicationEngine &engine)
     m_stores = {engineStore, vehicleStore, battery0Store, battery1Store,
                 gpsStore, motionStore, bluetoothStore, internetStore, modemStore, navigationStore,
                 settingsStore, otaStore, usbStore, speedLimitStore,
-                autoStandbyStore, scooterStore, cbBatteryStore, auxBatteryStore, dashboardStore,
+                autoStandbyStore, autoLockStore, scooterStore, cbBatteryStore, auxBatteryStore, dashboardStore,
                 screenStore, keycardStore, tripStore};
 
     BOOT_MARK("services wired");

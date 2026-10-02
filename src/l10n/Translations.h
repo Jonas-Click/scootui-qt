@@ -434,6 +434,8 @@ class Translations : public QObject
     // Auto-lock countdown
     Q_PROPERTY(QString autoLockTitle READ autoLockTitle NOTIFY languageChanged)
     Q_PROPERTY(QString autoLockCancelHint READ autoLockCancelHint NOTIFY languageChanged)
+    Q_PROPERTY(QString autoLockHoldTitle READ autoLockHoldTitle NOTIFY languageChanged)
+    Q_PROPERTY(QString autoLockHoldHint READ autoLockHoldHint NOTIFY languageChanged)
 
     // About
     Q_PROPERTY(QString aboutTitle READ aboutTitle NOTIFY languageChanged)
@@ -1143,6 +1145,8 @@ public:
     QString hibernationOrHoldBrakes() const { return lookup("hibernationOrHoldBrakes"); }
     QString autoLockTitle() const { return lookup("autoLockTitle"); }
     QString autoLockCancelHint() const { return lookup("autoLockCancelHint"); }
+    QString autoLockHoldTitle() const { return lookup("autoLockHoldTitle"); }
+    QString autoLockHoldHint() const { return lookup("autoLockHoldHint"); }
     QString hibernationCancel() const { return lookup("hibernationCancel"); }
     QString hibernationKickstand() const { return lookup("hibernationKickstand"); }
     QString hibernationConfirm() const { return lookup("hibernationConfirm"); }

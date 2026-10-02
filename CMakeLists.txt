@@ -97,6 +97,7 @@ set(CPP_SOURCES
     src/stores/UmsLogStore.cpp
     src/stores/SpeedLimitStore.cpp
     src/stores/AutoStandbyStore.cpp
+    src/stores/AutoLockStore.cpp
     src/stores/ScooterStore.cpp
     src/stores/CbBatteryStore.cpp
     src/stores/AuxBatteryStore.cpp
@@ -208,6 +209,7 @@ set(CPP_HEADERS
     src/stores/SpeedLimitParser.h
     src/stores/RoadSignStyle.h
     src/stores/AutoStandbyStore.h
+    src/stores/AutoLockStore.h
     src/stores/CbBatteryStore.h
     src/stores/AuxBatteryStore.h
     src/stores/ThemeStore.h
@@ -836,6 +838,8 @@ if(BUILD_TESTING)
         src/stores/SyncableStore.h
         src/stores/AutoStandbyStore.cpp
         src/stores/AutoStandbyStore.h
+        src/stores/AutoLockStore.cpp
+        src/stores/AutoLockStore.h
         src/stores/AuxBatteryStore.cpp
         src/stores/AuxBatteryStore.h
         src/stores/BatteryStore.cpp

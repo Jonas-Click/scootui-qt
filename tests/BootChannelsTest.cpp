@@ -3,6 +3,7 @@
 #include "repositories/BootChannels.h"
 #include "repositories/InMemoryMdbRepository.h"
 #include "stores/AutoStandbyStore.h"
+#include "stores/AutoLockStore.h"
 #include "stores/AuxBatteryStore.h"
 #include "stores/BatteryStore.h"
 #include "stores/BluetoothStore.h"
@@ -61,6 +62,7 @@ void BootChannelsTest::staticListMatchesStoreRegistration()
         new UsbStore(&repo, &owner),
         new SpeedLimitStore(&repo, &owner),
         new AutoStandbyStore(&repo, &owner),
+        new AutoLockStore(&repo, &owner),
         new ScooterStore(&repo, &owner),
         new CbBatteryStore(&repo, &owner),
         new AuxBatteryStore(&repo, &owner),

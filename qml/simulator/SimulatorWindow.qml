@@ -655,6 +655,28 @@ ApplicationWindow {
                                     font.pixelSize: 11
                                     horizontalAlignment: Text.AlignHCenter
                                 }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 4
+                                    SimLabel { text: "Handlebar hold" }
+                                    SimButton { text: "3s"; small: true; fixedWidth: 52
+                                        onClicked: simulator.setHandlebarAutoLockDeadline(3) }
+                                    SimButton { text: "5s"; small: true; fixedWidth: 52
+                                        onClicked: simulator.setHandlebarAutoLockDeadline(5) }
+                                    SimButton { text: "Clear"; small: true; fixedWidth: 52; color: "#f44336"
+                                        onClicked: simulator.clearHandlebarAutoLockDeadline() }
+                                    Item { Layout.fillWidth: true }
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    visible: typeof autoLockStore !== "undefined"
+                                             && autoLockStore.remainingSeconds > 0
+                                    text: "Hold remaining: " + (typeof autoLockStore !== "undefined"
+                                          ? autoLockStore.remainingSeconds : 0) + "s"
+                                    color: "#FF9800"
+                                    font.pixelSize: 11
+                                    horizontalAlignment: Text.AlignHCenter
+                                }
                             }
                         }
 

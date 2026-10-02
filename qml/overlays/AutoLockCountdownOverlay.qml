@@ -10,6 +10,15 @@ Item {
 
     property int vehicleState: typeof vehicleStore !== "undefined" ? vehicleStore.state : 0
     property int remaining: typeof autoStandbyStore !== "undefined" ? autoStandbyStore.remainingSeconds : 0
+    // Short countdown vehicle-service arms while the rider holds the handlebar
+    // at full left. Published on its own field, so the two countdowns never
+    // share a deadline.
+    property int holdRemaining: typeof autoLockStore !== "undefined" ? autoLockStore.remainingSeconds : 0
+
+    // The deliberate hold gesture wins over the idle countdown when both are
+    // somehow live at once: it is the shorter and more intentional of the two.
+    readonly property bool holdActive: vehicleState === stateParked && holdRemaining > 0
+    readonly property bool idleActive: vehicleState === stateParked && remaining > 0 && remaining <= 60
 
     // Theme-aware colors. Orange countdown stays as-is (accent works in both modes).
     readonly property bool isDark: typeof themeStore !== "undefined" ? themeStore.isDark : true
@@ -19,11 +28,13 @@ Item {
     readonly property color textPrimary:   isDark ? "#FFFFFF" : "#000000"
     readonly property color textSecondary: isDark ? "#B3FFFFFF" : "#B3000000"
 
-    // Show only during the last 60s of the auto-lock idle timer, while parked.
-    // The countdown is interrupted automatically: any user input (brake, kickstand,
-    // seatbox button) makes vehicle-service reset the timer and republish a later
-    // deadline, so `remaining` jumps back above 60 and this overlay disappears.
-    visible: vehicleState === stateParked && remaining > 0 && remaining <= 60
+    // Idle mode shows only during the last 60s of the auto-standby timer,
+    // while parked. The countdown is interrupted automatically: any user input
+    // (brake, kickstand, seatbox button) makes vehicle-service reset the timer
+    // and republish a later deadline, so `remaining` jumps back above 60 and
+    // this overlay disappears. Hold mode shows for the whole (short) handlebar
+    // countdown and clears the moment the rider lets go.
+    visible: holdActive || idleActive
 
     Rectangle {
         anchors.fill: parent
@@ -65,7 +76,9 @@ Item {
                 // Title
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: typeof translations !== "undefined" ? translations.autoLockTitle : "Auto-Locking"
+                    text: autoLockOverlay.holdActive
+                          ? (typeof translations !== "undefined" ? translations.autoLockHoldTitle : "Hold to auto-lock")
+                          : (typeof translations !== "undefined" ? translations.autoLockTitle : "Auto-Locking")
                     font.pixelSize: themeStore.fontHeading
                     font.weight: Font.Bold
                     color: autoLockOverlay.textPrimary
@@ -77,7 +90,9 @@ Item {
                 // Big countdown number
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: autoLockOverlay.remaining + "s"
+                    text: (autoLockOverlay.holdActive
+                           ? autoLockOverlay.holdRemaining
+                           : autoLockOverlay.remaining) + "s"
                     font.pixelSize: themeStore.fontHero
                     font.weight: Font.Bold
                     color: "#FF9800"
@@ -86,9 +101,11 @@ Item {
                 // Cancel hint
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: typeof translations !== "undefined"
-                          ? translations.autoLockCancelHint
-                          : "Touch a brake or kickstand to cancel"
+                    text: autoLockOverlay.holdActive
+                          ? (typeof translations !== "undefined" ? translations.autoLockHoldHint : "Release the handlebar to cancel")
+                          : (typeof translations !== "undefined"
+                             ? translations.autoLockCancelHint
+                             : "Touch a brake or kickstand to cancel")
                     font.pixelSize: themeStore.fontBody
                     color: autoLockOverlay.textSecondary
                     horizontalAlignment: Text.AlignHCenter

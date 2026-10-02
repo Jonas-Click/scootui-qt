@@ -1180,6 +1180,13 @@ void Translations::initStrings()
     en[QStringLiteral("autoLockCancelHint")] = QStringLiteral("Touch a brake or kickstand to cancel");
     de[QStringLiteral("autoLockCancelHint")] = QStringLiteral("Bremse oder Seitenst\u00E4nder bet\u00E4tigen zum Abbrechen");
 
+    // Handlebar hold-to-lock countdown (shorter, deliberate gesture).
+    en[QStringLiteral("autoLockHoldTitle")] = QStringLiteral("Hold to auto-lock");
+    de[QStringLiteral("autoLockHoldTitle")] = QStringLiteral("Zum automatischen Sperren halten");
+
+    en[QStringLiteral("autoLockHoldHint")] = QStringLiteral("Release the handlebar to cancel");
+    de[QStringLiteral("autoLockHoldHint")] = QStringLiteral("Lenker loslassen zum Abbrechen");
+
     // -----------------------------------------------------------------------
     // About
     // -----------------------------------------------------------------------

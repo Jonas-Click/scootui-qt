@@ -785,6 +785,25 @@ void SimulatorService::clearAutoStandbyDeadline()
     m_autoStandbyActive = false;
 }
 
+void SimulatorService::setHandlebarAutoLockDeadline(int secondsFromNow)
+{
+    // The overlay only renders in parked, so force parked state too, matching
+    // setAutoStandbyDeadline.
+    setVehicleState(QStringLiteral("parked"));
+    const qint64 deadline = QDateTime::currentSecsSinceEpoch() + secondsFromNow;
+    m_repo->set(QStringLiteral("vehicle"), QStringLiteral("auto-lock-deadline"),
+                QString::number(deadline));
+}
+
+void SimulatorService::clearHandlebarAutoLockDeadline()
+{
+    // Empty value is treated as "no countdown active" by AutoLockStore. We
+    // don't HDEL because the InMemory simulator repo doesn't notify
+    // SyncableStore on hdel — set("") goes through the fieldsUpdated path.
+    m_repo->set(QStringLiteral("vehicle"), QStringLiteral("auto-lock-deadline"),
+                QString());
+}
+
 void SimulatorService::setAutoStandbySetting(int seconds)
 {
     m_autoStandbySeconds = seconds;

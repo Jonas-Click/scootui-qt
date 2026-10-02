@@ -161,6 +161,8 @@ public:
     Q_INVOKABLE void setAutoStandbyDeadline(int secondsFromNow);
     Q_INVOKABLE void clearAutoStandbyDeadline();
     Q_INVOKABLE void setAutoStandbySetting(int seconds);
+    Q_INVOKABLE void setHandlebarAutoLockDeadline(int secondsFromNow);
+    Q_INVOKABLE void clearHandlebarAutoLockDeadline();
 
     // Dashboard / debug overlay
     Q_INVOKABLE void setDebugOverlay(const QString &mode);
